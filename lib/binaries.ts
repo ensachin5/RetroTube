@@ -9,8 +9,10 @@ export interface BinaryResolution {
   source: "env" | "project-bin" | "tmp-bin" | "system";
 }
 
+const archSuffix = process.arch === "arm64" ? "_aarch64" : "";
+// Must use standalone Linux binary (yt-dlp_linux) with bundled Python runtime for serverless
 const YTDLP_LINUX_URL =
-  "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
+  `https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux${archSuffix}`;
 
 function isExecutable(filePath: string): boolean {
   try {
@@ -76,8 +78,11 @@ export async function ensureYtDlpBinary(): Promise<string> {
     fs.mkdirSync(tmpBinDir, { recursive: true });
 
     await new Promise<void>((resolve, reject) => {
-      const file = fs.createWriteStream(targetPath, { mode: 0o755 });
-      const request = (url: string) => {
+      const download = (url: string, redirectsRemaining = 5) => {
+        if (redirectsRemaining <= 0) {
+          reject(new Error("Too many redirects downloading yt-dlp binary"));
+          return;
+        }
         https
           .get(url, (response) => {
             if (
@@ -86,7 +91,8 @@ export async function ensureYtDlpBinary(): Promise<string> {
               response.statusCode < 400 &&
               response.headers.location
             ) {
-              request(response.headers.location);
+              response.resume();
+              download(response.headers.location, redirectsRemaining - 1);
               return;
             }
             if (response.statusCode !== 200) {
@@ -97,11 +103,21 @@ export async function ensureYtDlpBinary(): Promise<string> {
               );
               return;
             }
+            const file = fs.createWriteStream(targetPath, { mode: 0o755 });
             response.pipe(file);
             file.on("finish", () => {
-              file.close();
-              fs.chmodSync(targetPath, 0o755);
-              resolve();
+              file.close(() => {
+                try {
+                  fs.chmodSync(targetPath, 0o755);
+                } catch {
+                  // Ignore chmod error if already executable
+                }
+                resolve();
+              });
+            });
+            file.on("error", (err) => {
+              fs.unlink(targetPath, () => undefined);
+              reject(err);
             });
           })
           .on("error", (err) => {
@@ -109,7 +125,7 @@ export async function ensureYtDlpBinary(): Promise<string> {
             reject(err);
           });
       };
-      request(YTDLP_LINUX_URL);
+      download(YTDLP_LINUX_URL);
     });
 
     return targetPath;

@@ -1,3 +1,4 @@
+import { ensureYtDlpBinary } from "@/lib/binaries";
 import { getEnv } from "@/lib/env";
 import { AppError, ERROR_CODES } from "@/lib/errors";
 import type { RawYtDlpInfo } from "./format.normalizer";
@@ -170,6 +171,7 @@ export function mapYtDlpStderrToError(stderr: string): AppError {
 export const ytdlpService = {
   async inspectVideo(canonicalUrl: string, signal?: AbortSignal): Promise<RawYtDlpInfo> {
     const env = getEnv();
+    const ytDlpPath = await ensureYtDlpBinary();
     const args = [
       "-J",
       "--no-playlist",
@@ -201,7 +203,7 @@ export const ytdlpService = {
     let result;
     try {
       result = await runSpawnedCommand({
-        command: env.YTDLP_PATH,
+        command: ytDlpPath,
         args,
         timeoutMs: env.YTDLP_FETCH_TIMEOUT_MS,
         signal,
@@ -237,7 +239,7 @@ export const ytdlpService = {
         // Transient rate limit from YouTube: wait 1.5s and retry once automatically
         await new Promise((res) => setTimeout(res, 1500));
         result = await runSpawnedCommand({
-          command: env.YTDLP_PATH,
+          command: ytDlpPath,
           args,
           timeoutMs: env.YTDLP_FETCH_TIMEOUT_MS,
           signal,
@@ -277,6 +279,7 @@ export const ytdlpService = {
     signal?: AbortSignal,
   ): Promise<RawYtDlpPlaylistInfo> {
     const env = getEnv();
+    const ytDlpPath = await ensureYtDlpBinary();
     const args = [
       "-J",
       "--flat-playlist",
@@ -309,7 +312,7 @@ export const ytdlpService = {
     let result;
     try {
       result = await runSpawnedCommand({
-        command: env.YTDLP_PATH,
+        command: ytDlpPath,
         args,
         timeoutMs: Math.max(30000, env.YTDLP_FETCH_TIMEOUT_MS * 2),
         signal,
@@ -384,6 +387,7 @@ export const ytdlpService = {
     onProgress?: (sample: DownloadProgressSample) => void;
   }): Promise<void> {
     const env = getEnv();
+    const ytDlpPath = await ensureYtDlpBinary();
     const args = [
       "--no-playlist",
       "--newline",
@@ -432,7 +436,7 @@ export const ytdlpService = {
     let result;
     try {
       result = await runSpawnedCommand({
-        command: env.YTDLP_PATH,
+        command: ytDlpPath,
         args,
         timeoutMs: env.YTDLP_DOWNLOAD_TIMEOUT_MS,
         stallTimeoutMs: 5 * 60 * 1000,
@@ -477,10 +481,10 @@ export const ytdlpService = {
   },
 
   async probeVersion(): Promise<{ ok: boolean; version?: string; error?: string }> {
-    const env = getEnv();
     try {
+      const ytDlpPath = await ensureYtDlpBinary();
       const result = await runSpawnedCommand({
-        command: env.YTDLP_PATH,
+        command: ytDlpPath,
         args: ["--version"],
         timeoutMs: 5000,
       });

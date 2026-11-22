@@ -12,8 +12,10 @@ import zlib from "node:zlib";
 import { execSync } from "node:child_process";
 
 const BIN_DIR = path.resolve(process.cwd(), "bin");
+const archSuffix = process.arch === "arm64" ? "_aarch64" : "";
+// Must use standalone Linux binary (yt-dlp_linux) with bundled Python runtime for serverless
 const YTDLP_LINUX_URL =
-  "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
+  `https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux${archSuffix}`;
 // Pre-compiled static Linux x86_64 ffmpeg
 const FFMPEG_LINUX_GZ_URL =
   "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/ffmpeg-linux-x64.gz";
@@ -76,7 +78,11 @@ async function main() {
 
   // Provision yt-dlp
   const ytdlpDest = path.join(BIN_DIR, "yt-dlp");
-  if (!fs.existsSync(ytdlpDest)) {
+  const ytdlpStat = fs.existsSync(ytdlpDest) ? fs.statSync(ytdlpDest) : null;
+  // PyInstaller yt-dlp_linux standalone binary is ~41MB; the zipapp without python is only ~3MB
+  const needsYtDlpDownload = !ytdlpStat || (isLinux && ytdlpStat.size < 20 * 1024 * 1024);
+
+  if (needsYtDlpDownload) {
     if (isLinux || isVercel) {
       console.log(`[RetroTube] Downloading standalone yt-dlp binary from ${YTDLP_LINUX_URL}...`);
       await downloadFile(YTDLP_LINUX_URL, ytdlpDest);

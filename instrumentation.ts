@@ -9,6 +9,10 @@ export async function register(): Promise<void> {
     ensureDbMigrated();
     await jobService.recoverOnStartup();
     await batchService.recoverInterruptedBatches();
-    jobService.startPeriodicSweeper();
+
+    // In long-running node servers (VPS/Docker), start the background file sweeper
+    if (process.env.VERCEL !== "1") {
+      jobService.startPeriodicSweeper();
+    }
   }
 }

@@ -50,11 +50,25 @@ function emptyToUndefined(value: string | undefined): string | undefined {
 }
 
 export function getEnv(): AppEnv {
+  const isVercel = process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
+  const rawDbPath = emptyToUndefined(process.env.DB_PATH);
+  const rawTempDir = emptyToUndefined(process.env.TEMP_DIR);
+
+  // In Vercel serverless functions, enforce /tmp storage to prevent read-only filesystem errors
+  const safeDbPath =
+    isVercel && rawDbPath && !rawDbPath.startsWith("/tmp") && rawDbPath !== ":memory:"
+      ? "/tmp/retrotube.db"
+      : rawDbPath;
+  const safeTempDir =
+    isVercel && rawTempDir && !rawTempDir.startsWith("/tmp")
+      ? "/tmp/retrotube"
+      : rawTempDir;
+
   return envSchema.parse({
     YTDLP_PATH: emptyToUndefined(process.env.YTDLP_PATH),
     FFMPEG_PATH: emptyToUndefined(process.env.FFMPEG_PATH),
-    TEMP_DIR: emptyToUndefined(process.env.TEMP_DIR),
-    DB_PATH: emptyToUndefined(process.env.DB_PATH),
+    TEMP_DIR: safeTempDir,
+    DB_PATH: safeDbPath,
     MAX_CONCURRENT_JOBS: emptyToUndefined(process.env.MAX_CONCURRENT_JOBS),
     MAX_VIDEO_MINUTES: emptyToUndefined(process.env.MAX_VIDEO_MINUTES),
     MAX_FILE_SIZE_GB: emptyToUndefined(process.env.MAX_FILE_SIZE_GB),
