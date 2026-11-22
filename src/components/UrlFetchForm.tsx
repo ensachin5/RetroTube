@@ -75,7 +75,7 @@ export function UrlFetchForm({
         htmlFor="youtube-url-input"
         className="block font-display text-xs sm:text-sm font-bold uppercase tracking-wider text-[var(--text-ink)]"
       >
-        YouTube Video URL
+        YouTube Video or Playlist URL
       </label>
 
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-stretch">
@@ -94,7 +94,7 @@ export function UrlFetchForm({
             hasError={validationError !== null}
             aria-invalid={validationError !== null}
             aria-describedby={validationError ? "url-validation-error" : "url-input-hint"}
-            placeholder="https://www.youtube.com/watch?v=..."
+            placeholder="https://www.youtube.com/watch?v=... or playlist?list=..."
             onChange={(e) => {
               setUrl(e.target.value);
               if (validationError) setValidationError(null);
@@ -160,8 +160,7 @@ export function UrlFetchForm({
         </p>
       ) : (
         <p id="url-input-hint" className="text-xs sm:text-sm text-[var(--text-muted)]">
-          Supports youtube.com, youtu.be, Shorts, and music.youtube.com (single videos
-          only).
+          Supports single videos, playlists, Shorts, and music.youtube.com.
         </p>
       )}
     </form>

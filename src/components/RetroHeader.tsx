@@ -1,8 +1,10 @@
+"use client";
+
 import Link from "next/link";
 
 export function RetroHeader() {
   return (
-    <header className="sticky top-0 md:static z-30 border-b-2 border-[var(--border-ink)] bg-[var(--bg-surface)]/95 backdrop-blur-sm pt-[env(safe-area-inset-top)]">
+    <header className="sticky top-0 md:static z-30 border-b-2 border-[var(--border-ink)] bg-[var(--bg-surface)]/95 backdrop-blur-sm pt-[max(0.25rem,env(safe-area-inset-top))]">
       <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-2 px-3 py-2.5 sm:px-6">
         <Link
           href="/"

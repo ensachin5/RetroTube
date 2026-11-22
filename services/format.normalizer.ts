@@ -1,4 +1,5 @@
 import type { FormatRow, VideoRow } from "@/db/schema";
+export type { FormatRow, VideoRow };
 import type { FormatInsertInput } from "@/repositories/formats.repo";
 
 export interface RawYtDlpFormat {
@@ -406,3 +407,162 @@ export function formatRowsToPresentation(
     audioConversions: audioFormats.length > 0 ? AUDIO_CONVERSION_PRESETS : [],
   };
 }
+
+export interface MatchedPresetResult {
+  format: FormatRow | null;
+  targetContainer: string;
+  targetBitrateKbps?: number | null;
+  needsMerge: boolean;
+  actualQuality: string;
+}
+
+export function matchFormatForPreset(
+  formats: FormatRow[],
+  preset: string,
+  kind: "video" | "audio",
+  preferredContainer?: string,
+): MatchedPresetResult {
+  if (kind === "audio") {
+    const audioFormats = formats
+      .filter((f) => f.kind === "audio")
+      .sort((a, b) => (b.bitrateKbps ?? 0) - (a.bitrateKbps ?? 0));
+    const bestAudio = audioFormats[0] ?? null;
+
+    if (preset === "mp3_320" || preset === "mp3-320") {
+      return {
+        format: bestAudio,
+        targetContainer: "mp3",
+        targetBitrateKbps: 320,
+        needsMerge: true,
+        actualQuality: "MP3 320 kbps",
+      };
+    }
+    if (preset === "mp3_192" || preset === "mp3-192") {
+      return {
+        format: bestAudio,
+        targetContainer: "mp3",
+        targetBitrateKbps: 192,
+        needsMerge: true,
+        actualQuality: "MP3 192 kbps",
+      };
+    }
+    if (preset === "mp3_128" || preset === "mp3-128") {
+      return {
+        format: bestAudio,
+        targetContainer: "mp3",
+        targetBitrateKbps: 128,
+        needsMerge: true,
+        actualQuality: "MP3 128 kbps",
+      };
+    }
+    if (preset === "m4a") {
+      return {
+        format: bestAudio,
+        targetContainer: "m4a",
+        targetBitrateKbps: 192,
+        needsMerge: true,
+        actualQuality: "M4A (AAC)",
+      };
+    }
+    if (preset === "opus") {
+      return {
+        format: bestAudio,
+        targetContainer: "opus",
+        targetBitrateKbps: 160,
+        needsMerge: true,
+        actualQuality: "Opus",
+      };
+    }
+    if (preset === "flac") {
+      return {
+        format: bestAudio,
+        targetContainer: "flac",
+        targetBitrateKbps: null,
+        needsMerge: true,
+        actualQuality: "FLAC (Lossless)",
+      };
+    }
+    if (preset === "wav") {
+      return {
+        format: bestAudio,
+        targetContainer: "wav",
+        targetBitrateKbps: null,
+        needsMerge: true,
+        actualQuality: "WAV",
+      };
+    }
+
+    return {
+      format: bestAudio,
+      targetContainer: preferredContainer || bestAudio?.container || "m4a",
+      targetBitrateKbps: bestAudio?.bitrateKbps ? Math.round(bestAudio.bitrateKbps) : null,
+      needsMerge: false,
+      actualQuality: `Best Audio (${bestAudio?.bitrateKbps ? Math.round(bestAudio.bitrateKbps) + "k" : bestAudio?.container || "audio"})`,
+    };
+  }
+
+  const videoFormats = formats
+    .filter((f) => f.kind === "video")
+    .sort((a, b) => {
+      const hDiff = (b.height ?? 0) - (a.height ?? 0);
+      if (hDiff !== 0) return hDiff;
+      return (b.bitrateKbps ?? 0) - (a.bitrateKbps ?? 0);
+    });
+
+  if (videoFormats.length === 0) {
+    return {
+      format: null,
+      targetContainer: preferredContainer || "mp4",
+      needsMerge: false,
+      actualQuality: "Unknown",
+    };
+  }
+
+  let targetHeight: number | null = null;
+  if (preset === "1080p") targetHeight = 1080;
+  else if (preset === "720p") targetHeight = 720;
+  else if (preset === "480p") targetHeight = 480;
+
+  let selectedFormat: FormatRow | null = null;
+
+  if (targetHeight === null || preset === "best_video" || preset === "best") {
+    selectedFormat = videoFormats[0] ?? null;
+  } else {
+    selectedFormat = videoFormats.find((f) => f.height === targetHeight) ?? null;
+
+    if (!selectedFormat) {
+      selectedFormat =
+        videoFormats.find((f) => f.height !== null && f.height! < targetHeight) ?? null;
+    }
+
+    if (!selectedFormat) {
+      selectedFormat = videoFormats[videoFormats.length - 1] ?? null;
+    }
+  }
+
+  if (!selectedFormat) {
+    selectedFormat = videoFormats[0] ?? null;
+  }
+
+  if (!selectedFormat) {
+    return {
+      format: null,
+      targetContainer: preferredContainer || "mp4",
+      needsMerge: false,
+      actualQuality: "Unknown",
+    };
+  }
+
+  const container =
+    preferredContainer || (selectedFormat.container === "webm" ? "webm" : "mp4");
+  const needsMerge = selectedFormat.acodec === null;
+  const actualQuality = `${selectedFormat.resolution || (selectedFormat.height ? selectedFormat.height + "p" : "video")}`;
+
+  return {
+    format: selectedFormat,
+    targetContainer: container,
+    needsMerge,
+    actualQuality,
+  };
+}
+

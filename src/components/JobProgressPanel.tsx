@@ -178,7 +178,6 @@ export function JobProgressPanel({
             >
               {snapshot.status}
             </Badge>
-            {job.needsMerge ? <Badge tone="outline">ffmpeg pipeline</Badge> : null}
           </div>
           <p className="truncate font-display text-sm sm:text-base font-bold text-[var(--text-ink)]">
             {job.outputFilename}
@@ -223,19 +222,24 @@ export function JobProgressPanel({
         ) : null}
 
         {snapshot.status === "done" ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-            <p className="text-sm font-semibold text-[var(--text-ink)]">
-              Ready to save ({formatBytes(snapshot.bytesTotal)}). Download should start
-              automatically.
-            </p>
-            <a
-              ref={downloadAnchorRef}
-              href={snapshot.streamUrl ?? job.streamUrl}
-              download={job.outputFilename}
-              className="retro-btn min-h-11 inline-flex items-center justify-center rounded-md bg-[var(--accent-teal)] px-4 py-2 font-display text-sm font-bold uppercase tracking-wider text-[var(--on-teal)] no-underline"
-            >
-              Save File
-            </a>
+          <div className="flex flex-col gap-2 pt-1">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-[var(--text-ink)]">
+                Ready to save ({formatBytes(snapshot.bytesTotal)}). Download should start
+                automatically.
+              </p>
+              <a
+                ref={downloadAnchorRef}
+                href={snapshot.streamUrl ?? job.streamUrl}
+                download={job.outputFilename}
+                className="retro-btn min-h-11 inline-flex items-center justify-center rounded-md bg-[var(--accent-teal)] px-4 py-2 font-display text-sm font-bold uppercase tracking-wider text-[var(--on-teal)] no-underline w-full sm:w-auto"
+              >
+                Save File
+              </a>
+            </div>
+            <div className="text-xs font-mono text-[var(--text-muted)] flex items-center gap-1.5">
+              <span>⏱️ Temporary file kept on server for 120 min before cleanup.</span>
+            </div>
           </div>
         ) : null}
 

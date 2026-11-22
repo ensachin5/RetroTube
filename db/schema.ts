@@ -49,6 +49,63 @@ export const formats = sqliteTable(
   ],
 );
 
+export const batches = sqliteTable(
+  "batches",
+  {
+    id: text("id").primaryKey(),
+    sourceUrl: text("source_url").notNull(),
+    youtubePlaylistId: text("youtube_playlist_id").notNull(),
+    title: text("title").notNull(),
+    channel: text("channel").notNull(),
+    itemCount: integer("item_count").notNull(),
+    selectedCount: integer("selected_count").notNull(),
+    qualityPreset: text("quality_preset").notNull(),
+    kind: text("kind", { enum: ["video", "audio"] }).notNull(),
+    targetContainer: text("target_container").notNull(),
+    status: text("status", {
+      enum: ["queued", "running", "done", "failed", "cancelled", "paused"],
+    })
+      .notNull()
+      .default("queued"),
+    createdAt: integer("created_at", { mode: "number" }).notNull(),
+    finishedAt: integer("finished_at", { mode: "number" }),
+  },
+  (table) => [
+    index("idx_batches_status").on(table.status),
+    index("idx_batches_created_at").on(table.createdAt),
+    index("idx_batches_playlist_id").on(table.youtubePlaylistId),
+  ],
+);
+
+export const batchItems = sqliteTable(
+  "batch_items",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    batchId: text("batch_id")
+      .notNull()
+      .references(() => batches.id, { onDelete: "cascade" }),
+    videoId: integer("video_id").references(() => videos.id, { onDelete: "set null" }),
+    position: integer("position").notNull(),
+    youtubeId: text("youtube_id").notNull(),
+    title: text("title").notNull(),
+    durationSec: integer("duration_sec").notNull().default(0),
+    status: text("status", {
+      enum: ["queued", "running", "done", "failed", "skipped", "cancelled"],
+    })
+      .notNull()
+      .default("queued"),
+    jobId: text("job_id").references(() => downloadJobs.id, { onDelete: "set null" }),
+    errorCode: text("error_code"),
+    retryCount: integer("retry_count").notNull().default(0),
+  },
+  (table) => [
+    index("idx_batch_items_batch_id").on(table.batchId),
+    index("idx_batch_items_status").on(table.status),
+    index("idx_batch_items_youtube_id").on(table.youtubeId),
+    index("idx_batch_items_job_id").on(table.jobId),
+  ],
+);
+
 export const downloadJobs = sqliteTable(
   "download_jobs",
   {
@@ -59,12 +116,13 @@ export const downloadJobs = sqliteTable(
     formatId: integer("format_id").references(() => formats.id, {
       onDelete: "set null",
     }),
+    batchItemId: integer("batch_item_id"),
     sourceFormatId: text("source_format_id").notNull(),
     targetContainer: text("target_container").notNull(),
     targetBitrateKbps: integer("target_bitrate_kbps"),
     needsMerge: integer("needs_merge", { mode: "boolean" }).notNull().default(false),
     status: text("status", {
-      enum: ["queued", "running", "done", "failed", "cancelled"],
+      enum: ["queued", "running", "done", "failed", "cancelled", "paused"],
     })
       .notNull()
       .default("queued"),
@@ -82,6 +140,7 @@ export const downloadJobs = sqliteTable(
     index("idx_download_jobs_status").on(table.status),
     index("idx_download_jobs_created_at").on(table.createdAt),
     index("idx_download_jobs_video_id").on(table.videoId),
+    index("idx_download_jobs_batch_item_id").on(table.batchItemId),
   ],
 );
 
@@ -111,9 +170,14 @@ export type VideoRow = typeof videos.$inferSelect;
 export type NewVideoRow = typeof videos.$inferInsert;
 export type FormatRow = typeof formats.$inferSelect;
 export type NewFormatRow = typeof formats.$inferInsert;
+export type BatchRow = typeof batches.$inferSelect;
+export type NewBatchRow = typeof batches.$inferInsert;
+export type BatchItemRow = typeof batchItems.$inferSelect;
+export type NewBatchItemRow = typeof batchItems.$inferInsert;
 export type DownloadJobRow = typeof downloadJobs.$inferSelect;
 export type NewDownloadJobRow = typeof downloadJobs.$inferInsert;
 export type HistoryRow = typeof history.$inferSelect;
 export type NewHistoryRow = typeof history.$inferInsert;
 export type SettingRow = typeof settings.$inferSelect;
 export type NewSettingRow = typeof settings.$inferInsert;
+

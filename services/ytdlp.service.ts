@@ -9,6 +9,28 @@ export interface DownloadProgressSample {
   etaSec: number | null;
 }
 
+export interface RawYtDlpPlaylistEntry {
+  id?: string;
+  title?: string;
+  duration?: number | null;
+  thumbnail?: string | null;
+  thumbnails?: Array<{ url: string; width?: number; height?: number }>;
+  url?: string;
+  ie_key?: string;
+  _type?: string;
+  availability?: string;
+}
+
+export interface RawYtDlpPlaylistInfo {
+  _type?: string;
+  id?: string;
+  title?: string;
+  uploader?: string;
+  channel?: string;
+  uploader_id?: string;
+  entries?: Array<RawYtDlpPlaylistEntry | null>;
+}
+
 const YTDLP_PROGRESS_REGEX =
   /\[download\]\s+(\d+(?:\.\d+)?)%(?:\s+of\s+~?\s*\S+)?(?:\s+at\s+(\S+))?(?:\s+ETA\s+(\S+))?/i;
 
@@ -85,7 +107,7 @@ export function mapYtDlpStderrToError(stderr: string): AppError {
     return new AppError({
       code: ERROR_CODES.LIVE_STREAM,
       status: 422,
-      message: "Live streams and upcoming premieres cannot be downloaded in v1.",
+      message: "Live streams and upcoming premieres cannot be downloaded.",
     });
   }
 
@@ -123,6 +145,19 @@ export function mapYtDlpStderrToError(stderr: string): AppError {
     });
   }
 
+  if (
+    lower.includes("this playlist type is unviewable") ||
+    lower.includes("unable to recognize playlist") ||
+    lower.includes("playlist does not exist") ||
+    lower.includes("the playlist does not exist")
+  ) {
+    return new AppError({
+      code: ERROR_CODES.PLAYLIST_EMPTY,
+      status: 404,
+      message: "This playlist does not exist, is private, or cannot be viewed as a batch playlist.",
+    });
+  }
+
   return new AppError({
     code: ERROR_CODES.YTDLP_FAILED,
     status: 502,
@@ -141,6 +176,14 @@ export const ytdlpService = {
       "--no-check-formats",
       "--skip-download",
       "--no-js-runtimes",
+      "--no-write-comments",
+      "--no-write-thumbnail",
+      "--no-write-subs",
+      "--no-write-auto-subs",
+      "--extractor-args",
+      "youtube:skip=translated_subs,comments",
+      "--socket-timeout",
+      "10",
     ];
     if (env.YTDLP_COOKIES_FILE) {
       args.push("--cookies", env.YTDLP_COOKIES_FILE);
@@ -210,6 +253,105 @@ export const ytdlpService = {
     return parsed;
   },
 
+  async inspectPlaylistFlat(
+    canonicalPlaylistUrl: string,
+    signal?: AbortSignal,
+  ): Promise<RawYtDlpPlaylistInfo> {
+    const env = getEnv();
+    const args = [
+      "-J",
+      "--flat-playlist",
+      "--no-warnings",
+      "--no-check-formats",
+      "--skip-download",
+      "--no-js-runtimes",
+      "--ignore-errors",
+      "--no-write-comments",
+      "--no-write-thumbnail",
+      "--no-write-subs",
+      "--no-write-auto-subs",
+      "--extractor-args",
+      "youtube:skip=translated_subs,comments",
+      "--socket-timeout",
+      "10",
+    ];
+    if (env.YTDLP_COOKIES_FILE) {
+      args.push("--cookies", env.YTDLP_COOKIES_FILE);
+    }
+    if (env.YTDLP_PROXY) {
+      args.push("--proxy", env.YTDLP_PROXY);
+    }
+    args.push(canonicalPlaylistUrl);
+
+    let result;
+    try {
+      result = await runSpawnedCommand({
+        command: env.YTDLP_PATH,
+        args,
+        timeoutMs: Math.max(30000, env.YTDLP_FETCH_TIMEOUT_MS * 2),
+        signal,
+      });
+    } catch (err) {
+      throw new AppError({
+        code: ERROR_CODES.YTDLP_FAILED,
+        status: 502,
+        message: "Failed to execute yt-dlp binary for playlist.",
+        cause: err,
+      });
+    }
+
+    if (result.timedOut) {
+      throw new AppError({
+        code: ERROR_CODES.TIMEOUT,
+        status: 504,
+        message: "Fetching playlist metadata timed out. Please try again.",
+      });
+    }
+
+    if (result.aborted) {
+      throw new AppError({
+        code: ERROR_CODES.JOB_CANCELLED,
+        status: 499,
+        message: "Playlist fetch was cancelled.",
+      });
+    }
+
+    if (result.code !== 0) {
+      const trimmed = (result.stdout || "").trim();
+      if (!trimmed || trimmed === "null") {
+        throw mapYtDlpStderrToError(result.stderr || result.stdout);
+      }
+    }
+
+    let parsed: RawYtDlpPlaylistInfo;
+    try {
+      parsed = JSON.parse(result.stdout) as RawYtDlpPlaylistInfo;
+    } catch (err) {
+      if (result.code !== 0) {
+        throw mapYtDlpStderrToError(result.stderr || result.stdout);
+      }
+      throw new AppError({
+        code: ERROR_CODES.YTDLP_FAILED,
+        status: 502,
+        message: "yt-dlp returned invalid playlist metadata JSON.",
+        cause: err,
+      });
+    }
+
+    if (!parsed || typeof parsed !== "object") {
+      if (result.code !== 0) {
+        throw mapYtDlpStderrToError(result.stderr || result.stdout);
+      }
+      throw new AppError({
+        code: ERROR_CODES.PLAYLIST_EMPTY,
+        status: 404,
+        message: "Could not retrieve playlist metadata. The playlist may be empty, private, or unavailable.",
+      });
+    }
+
+    return parsed;
+  },
+
   async downloadStream(params: {
     canonicalUrl: string;
     formatSelector: string;
@@ -222,18 +364,25 @@ export const ytdlpService = {
       "--no-playlist",
       "--newline",
       "--progress",
-      "--no-part",
+      "--continue",
+      "--no-js-runtimes",
+      "--no-warnings",
       "--concurrent-fragments",
       String(env.YTDLP_CONCURRENT_FRAGMENTS),
       "--buffer-size",
       env.YTDLP_BUFFER_SIZE,
-      "--http-chunk-size",
-      env.YTDLP_HTTP_CHUNK_SIZE,
       "--retries",
-      "3",
+      "5",
       "--fragment-retries",
       "5",
+      "--no-mtime",
+      "--extractor-args",
+      "youtube:skip=translated_subs,comments",
     ];
+
+    if (env.YTDLP_HTTP_CHUNK_SIZE && env.YTDLP_HTTP_CHUNK_SIZE !== "none") {
+      args.push("--http-chunk-size", env.YTDLP_HTTP_CHUNK_SIZE);
+    }
 
     if (env.YTDLP_COOKIES_FILE) {
       args.push("--cookies", env.YTDLP_COOKIES_FILE);
@@ -258,6 +407,7 @@ export const ytdlpService = {
         command: env.YTDLP_PATH,
         args,
         timeoutMs: env.YTDLP_DOWNLOAD_TIMEOUT_MS,
+        stallTimeoutMs: 5 * 60 * 1000,
         signal: params.signal,
         onStdoutLine: (line) => {
           const sample = parseYtDlpProgressLine(line);

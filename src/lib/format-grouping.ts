@@ -182,9 +182,33 @@ const ERROR_COPY_MAP: Record<string, FriendlyErrorCopy> = {
     retryable: false,
   },
   PLAYLIST_NOT_SUPPORTED: {
-    title: "Playlist Detected (v1 Single Video Only)",
-    message:
-      "Playlist URLs are not supported yet. Please pick a single video link instead.",
+    title: "Playlist URL Detected",
+    message: "Playlist URLs are not supported for single-video fetch. Switch to playlist mode.",
+    retryable: false,
+  },
+  PLAYLIST_EMPTY: {
+    title: "Playlist Empty",
+    message: "This playlist does not contain any videos to download.",
+    retryable: false,
+  },
+  PLAYLIST_TOO_LARGE: {
+    title: "Playlist Limit Exceeded",
+    message: "This playlist exceeds the maximum item cap. Use the 'first N' option to load.",
+    retryable: false,
+  },
+  ITEM_UNAVAILABLE: {
+    title: "Track Unavailable",
+    message: "This video is private, removed, or region-restricted and was skipped.",
+    retryable: false,
+  },
+  INSUFFICIENT_DISK: {
+    title: "Low Disk Space",
+    message: "The server does not have sufficient temporary storage. Clean disk space to proceed.",
+    retryable: true,
+  },
+  FILE_TOO_LARGE: {
+    title: "File Limit Exceeded",
+    message: "The file exceeds the server's maximum allowed size limit.",
     retryable: false,
   },
   PRIVATE_VIDEO: {

@@ -53,6 +53,8 @@ export interface FormatResultsPanelProps {
   onSelectAction: (action: SelectedAction) => void;
   onStartDownload: (action: SelectedAction) => void;
   startingJob: boolean;
+  sourceUrl?: string;
+  onLoadPlaylist?: (url: string) => void;
 }
 
 export function FormatResultsPanel({
@@ -65,7 +67,13 @@ export function FormatResultsPanel({
   onSelectAction,
   onStartDownload,
   startingJob,
+  sourceUrl,
+  onLoadPlaylist,
 }: FormatResultsPanelProps) {
+  const isIos =
+    typeof navigator !== "undefined" &&
+    (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
   const tabOptions: TabOption<"video" | "audio">[] = [
     { id: "video", label: "Video", count: result.videoFormats.length },
     {
@@ -78,9 +86,22 @@ export function FormatResultsPanel({
   return (
     <section aria-label="Video details and formats" className="space-y-5">
       {result.hadPlaylistParam ? (
-        <Card tone="alt" className="px-4 py-3 text-sm font-medium">
-          Playlist parameter ignored — loaded single video only (v1 supports single
-          videos).
+        <Card tone="alt" className="px-4 py-3 text-sm font-medium flex flex-wrap items-center justify-between gap-3">
+          <span>This video belongs to a playlist.</span>
+          {onLoadPlaylist ? (
+            <Button
+              variant="surface"
+              size="sm"
+              onClick={() =>
+                onLoadPlaylist(
+                  sourceUrl ||
+                    `https://www.youtube.com/watch?v=${result.video.youtubeId}`,
+                )
+              }
+            >
+              📜 Load Whole Playlist
+            </Button>
+          ) : null}
         </Card>
       ) : null}
 
@@ -220,6 +241,16 @@ export function FormatResultsPanel({
                                 ) : null}
                                 <span>#{fmt.formatId}</span>
                               </div>
+                              {fmt.filesizeBytes && fmt.filesizeBytes > 1024 * 1024 * 1024 ? (
+                                <div className="text-[11px] font-mono text-[var(--accent-mustard)] flex items-center gap-1">
+                                  <span>⚠️ Large Tape (&gt;1 GB): High mobile data usage.</span>
+                                </div>
+                              ) : null}
+                              {isIos && fmt.filesizeBytes && fmt.filesizeBytes > 2 * 1024 * 1024 * 1024 ? (
+                                <div className="text-[11px] font-mono text-[var(--accent-tomato)] flex items-center gap-1 p-1 rounded bg-[var(--bg-canvas)] border border-[var(--accent-tomato)]">
+                                  <span>📱 iOS Safari: Downloads &gt;2 GB may fail in mobile Safari. Desktop recommended.</span>
+                                </div>
+                              ) : null}
                             </button>
 
                             <Button

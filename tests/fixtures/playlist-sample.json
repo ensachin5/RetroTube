@@ -1,0 +1,45 @@
+{
+  "_type": "playlist",
+  "id": "PL_TEST_SAMPLE_FIXTURE",
+  "title": "Retro Waves & Synth Classics 1985",
+  "channel": "VHS Nostalgia Club",
+  "uploader": "VHS Nostalgia Club",
+  "entries": [
+    {
+      "id": "vid_synth_01",
+      "title": "Kavinsky - Nightcall (Drive OST)",
+      "duration": 259,
+      "thumbnail": "https://i.ytimg.com/vi/vid_synth_01/hqdefault.jpg",
+      "_type": "url"
+    },
+    {
+      "id": "vid_synth_02",
+      "title": "[Deleted video]",
+      "duration": null,
+      "_type": "url"
+    },
+    {
+      "id": "vid_synth_03",
+      "title": "[Private video]",
+      "duration": null,
+      "availability": "private",
+      "_type": "url"
+    },
+    {
+      "id": "vid_synth_04",
+      "title": "Perturbator - Future Club",
+      "duration": 290,
+      "thumbnails": [
+        { "url": "https://i.ytimg.com/vi/vid_synth_04/hqdefault.jpg" }
+      ],
+      "_type": "url"
+    },
+    {
+      "id": "vid_synth_05",
+      "title": "Carpenter Brut - Turbo Killer",
+      "duration": 208,
+      "thumbnail": "https://i.ytimg.com/vi/vid_synth_05/hqdefault.jpg",
+      "_type": "url"
+    }
+  ]
+}

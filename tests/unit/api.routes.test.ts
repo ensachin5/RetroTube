@@ -7,10 +7,19 @@ import { GET as healthGET } from "@/app/api/health/route";
 import { POST as loginPOST } from "@/app/api/auth/login/route";
 import { POST as logoutPOST } from "@/app/api/auth/logout/route";
 import { POST as fetchPOST } from "@/app/api/fetch/route";
+import { POST as playlistFetchPOST } from "@/app/api/playlist/fetch/route";
 import { POST as downloadPOST } from "@/app/api/download/route";
 import { GET as streamGET } from "@/app/api/download/[jobId]/stream/route";
 import { GET as eventsGET } from "@/app/api/jobs/[jobId]/events/route";
 import { POST as cancelPOST } from "@/app/api/jobs/[jobId]/cancel/route";
+import { POST as batchPOST } from "@/app/api/batch/route";
+import {
+  GET as batchGET,
+  DELETE as batchDELETE,
+} from "@/app/api/batch/[id]/route";
+import { POST as batchCancelPOST } from "@/app/api/batch/[id]/cancel/route";
+import { POST as batchRetryPOST } from "@/app/api/batch/[id]/retry-failed/route";
+import { GET as batchZipGET } from "@/app/api/batch/[id]/zip/route";
 import { GET as historyGET } from "@/app/api/history/route";
 import { DELETE as historyDELETE } from "@/app/api/history/[id]/route";
 import { closeDb, getDb } from "@/db/client";
@@ -89,6 +98,20 @@ if (mode === "sleep") {
   console.error("ERROR: Generic extractor crash");
   process.exit(1);
 } else if (args.includes("-J")) {
+  if (args.includes("--flat-playlist")) {
+    const playlistFixture = {
+      _type: "playlist",
+      id: "PL_MOCK_123",
+      title: "Synthwave Mock Playlist",
+      channel: "Retrowave",
+      entries: [
+        { id: "dQw4w9WgXcQ", title: "Never Gonna Give You Up", duration: 213, _type: "url" },
+        { id: "mock_track_2", title: "Track Two", duration: 180, _type: "url" },
+      ],
+    };
+    process.stdout.write(JSON.stringify(playlistFixture));
+    process.exit(0);
+  }
   const fixture = JSON.parse(fs.readFileSync(process.env.MOCK_FIXTURE_PATH, "utf8"));
   if (mode === "live") {
     fixture.is_live = true;
@@ -572,5 +595,90 @@ process.exit(0);
       { params: Promise.resolve({ jobId: j2.jobId }) },
     );
     expect(await j2Stream.text()).toBe("RETROTUBE_MEDIA_PAYLOAD_0123456789");
+  });
+
+  it("executes playlist batch lifecycle: fetch -> create batch -> batch items resolve -> zip download -> cancel / retry -> delete", async () => {
+    // 1. Fetch playlist metadata
+    const playlistRes = await playlistFetchPOST(
+      makeJsonRequest("http://localhost:3000/api/playlist/fetch", "POST", {
+        url: "https://www.youtube.com/playlist?list=PL_MOCK_123",
+      }),
+    );
+    expect(playlistRes.status).toBe(200);
+    const playlistData = (await playlistRes.json()) as {
+      isCombined: boolean;
+      playlist: {
+        id: string;
+        title: string;
+        channel: string;
+        itemCount: number;
+        items: Array<{ position: number; youtubeId: string; title: string; durationSec: number; isAvailable: boolean }>;
+      };
+    };
+    expect(playlistData.isCombined).toBe(false);
+    expect(playlistData.playlist.itemCount).toBe(2);
+
+    // 2. Create batch
+    const batchRes = await batchPOST(
+      makeJsonRequest("http://localhost:3000/api/batch", "POST", {
+        playlistId: playlistData.playlist.id,
+        sourceUrl: "https://www.youtube.com/playlist?list=PL_MOCK_123",
+        title: playlistData.playlist.title,
+        channel: playlistData.playlist.channel,
+        selectedItemIds: ["dQw4w9WgXcQ"],
+        items: playlistData.playlist.items,
+        qualityPreset: "1080p",
+        kind: "video",
+        targetContainer: "mp4",
+      }),
+    );
+    expect(batchRes.status).toBe(202);
+    const batchPayload = (await batchRes.json()) as { batchId: string; status: string };
+    const batchId = batchPayload.batchId;
+
+    // 3. Get batch status
+    const statusRes = await batchGET(
+      new NextRequest(`http://localhost:3000/api/batch/${batchId}`),
+      { params: Promise.resolve({ id: batchId }) },
+    );
+    expect(statusRes.status).toBe(200);
+    const statusData = (await statusRes.json()) as {
+      batch: { id: string; selectedCount: number; items: Array<{ id: number; status: string }> };
+    };
+    expect(statusData.batch.id).toBe(batchId);
+    expect(statusData.batch.selectedCount).toBe(1);
+
+    // 4. Test zip download when no completed items exist yet (throws INVALID_JOB_STATE 409)
+    await expect(
+      batchZipGET(
+        new NextRequest(`http://localhost:3000/api/batch/${batchId}/zip`),
+        { params: Promise.resolve({ id: batchId }) },
+      ),
+    ).rejects.toThrowError(
+      expect.objectContaining({ code: ERROR_CODES.INVALID_JOB_STATE }),
+    );
+
+    // 5. Test cancel batch
+    const cancelRes = await batchCancelPOST(
+      makeJsonRequest(`http://localhost:3000/api/batch/${batchId}/cancel`, "POST"),
+      { params: Promise.resolve({ id: batchId }) },
+    );
+    expect(cancelRes.status).toBe(200);
+
+    // 5. Test retry failed items
+    const retryRes = await batchRetryPOST(
+      makeJsonRequest(`http://localhost:3000/api/batch/${batchId}/retry-failed`, "POST"),
+      { params: Promise.resolve({ id: batchId }) },
+    );
+    expect(retryRes.status).toBe(200);
+
+    // 6. Test delete batch
+    const deleteRes = await batchDELETE(
+      new NextRequest(`http://localhost:3000/api/batch/${batchId}`),
+      { params: Promise.resolve({ id: batchId }) },
+    );
+    expect(deleteRes.status).toBe(200);
+    const deleteData = (await deleteRes.json()) as { deleted: boolean; id: string };
+    expect(deleteData.deleted).toBe(true);
   });
 });

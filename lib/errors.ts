@@ -6,6 +6,11 @@ export const ERROR_CODES = {
   VALIDATION_ERROR: "VALIDATION_ERROR",
   INVALID_URL: "INVALID_URL",
   PLAYLIST_NOT_SUPPORTED: "PLAYLIST_NOT_SUPPORTED",
+  PLAYLIST_EMPTY: "PLAYLIST_EMPTY",
+  PLAYLIST_TOO_LARGE: "PLAYLIST_TOO_LARGE",
+  ITEM_UNAVAILABLE: "ITEM_UNAVAILABLE",
+  INSUFFICIENT_DISK: "INSUFFICIENT_DISK",
+  FILE_TOO_LARGE: "FILE_TOO_LARGE",
   UNAUTHORIZED: "UNAUTHORIZED",
   JOB_NOT_FOUND: "JOB_NOT_FOUND",
   INVALID_JOB_STATE: "INVALID_JOB_STATE",
@@ -82,7 +87,10 @@ export function normalizeError(err: unknown): AppError {
   return new AppError({
     code: ERROR_CODES.INTERNAL_ERROR,
     status: 500,
-    message: "An unexpected internal error occurred.",
+    message:
+      err instanceof Error && err.message
+        ? err.message
+        : "An unexpected internal error occurred.",
     cause: err,
   });
 }
@@ -95,15 +103,17 @@ export function toErrorResponse(
   const appError = normalizeError(err);
 
   if (appError.status >= 500) {
+    const rawError = appError.cause ?? appError;
     logger.error(appError.message, {
       requestId,
       route,
-      status: appError.status,
       errorCode: appError.code,
-      cause:
-        appError.cause instanceof Error
-          ? appError.cause.message
-          : String(appError.cause ?? ""),
+      status: appError.status,
+      details: appError.details,
+      error:
+        rawError instanceof Error
+          ? { name: rawError.name, message: rawError.message, stack: rawError.stack }
+          : rawError,
     });
   } else {
     logger.warn(appError.message, {
@@ -111,22 +121,24 @@ export function toErrorResponse(
       route,
       status: appError.status,
       errorCode: appError.code,
+      details: appError.details,
     });
   }
 
-  const body: ErrorEnvelope = {
-    error: {
-      code: appError.code,
-      message: appError.message,
-      requestId,
-      ...(appError.details ? { details: appError.details } : {}),
+  return NextResponse.json(
+    {
+      error: {
+        code: appError.code,
+        message: appError.message,
+        requestId,
+        ...(appError.details ? { details: appError.details } : {}),
+      },
     },
-  };
-
-  return NextResponse.json(body, {
-    status: appError.status,
-    headers: {
-      "X-Request-Id": requestId,
+    {
+      status: appError.status,
+      headers: {
+        "X-Request-Id": requestId,
+      },
     },
-  });
+  );
 }

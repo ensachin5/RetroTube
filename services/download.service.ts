@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import type { FormatRow } from "@/db/schema";
+import { getEnv } from "@/lib/env";
 import { AppError, ERROR_CODES } from "@/lib/errors";
 import { buildContentDisposition, buildSafeOutputFilename } from "@/lib/filename";
 import { getMimeTypeForContainer, parseRangeHeader } from "@/lib/http";
@@ -7,6 +8,7 @@ import { formatsRepo } from "@/repositories/formats.repo";
 import { historyRepo } from "@/repositories/history.repo";
 import { jobsRepo } from "@/repositories/jobs.repo";
 import { videosRepo } from "@/repositories/videos.repo";
+import { diskService } from "./disk.service";
 import { jobService } from "./job.service";
 
 export const ALLOWED_TARGET_CONTAINERS = [
@@ -115,7 +117,8 @@ function resolveTargetAndQuality(params: {
 }
 
 export const downloadService = {
-  enqueue(input: EnqueueDownloadInput): EnqueueDownloadResult {
+  async enqueue(input: EnqueueDownloadInput): Promise<EnqueueDownloadResult> {
+    const env = getEnv();
     const video = videosRepo.findById(input.videoId);
     if (!video) {
       throw new AppError({
@@ -178,11 +181,32 @@ export const downloadService = {
       });
     }
 
+    if (env.MAX_FILE_SIZE_GB > 0 && effectiveFormat.filesizeBytes) {
+      const maxBytes = env.MAX_FILE_SIZE_GB * 1024 * 1024 * 1024;
+      if (effectiveFormat.filesizeBytes > maxBytes) {
+        throw new AppError({
+          code: ERROR_CODES.FILE_TOO_LARGE,
+          status: 422,
+          message: `The requested media file (${(effectiveFormat.filesizeBytes / (1024 * 1024 * 1024)).toFixed(2)} GB) exceeds the configured limit of ${env.MAX_FILE_SIZE_GB} GB.`,
+          details: {
+            filesizeBytes: effectiveFormat.filesizeBytes,
+            maxBytes,
+          },
+        });
+      }
+    }
+
     const plan = resolveTargetAndQuality({
       format: effectiveFormat,
       requestedContainer: input.targetContainer ?? null,
       requestedBitrate: input.audioBitrateKbps ?? null,
     });
+
+    const estimatedBytes = diskService.estimateJobBytes(
+      effectiveFormat.filesizeBytes,
+      plan.needsMerge,
+    );
+    await diskService.assertSufficientDisk(estimatedBytes);
 
     const jobId = globalThis.crypto.randomUUID();
     const outputFilename = buildSafeOutputFilename({
@@ -318,6 +342,9 @@ export const downloadService = {
           const bytes =
             typeof chunk === "string" ? Buffer.from(chunk) : new Uint8Array(chunk);
           controller.enqueue(bytes);
+          if (controller.desiredSize !== null && controller.desiredSize <= 0) {
+            nodeStream?.pause();
+          }
         });
 
         nodeStream.on("end", () => {
@@ -337,6 +364,11 @@ export const downloadService = {
           }
           finalizeCleanup(true);
         });
+      },
+      pull() {
+        if (nodeStream && nodeStream.isPaused()) {
+          nodeStream.resume();
+        }
       },
       cancel() {
         if (nodeStream && !nodeStream.destroyed) {

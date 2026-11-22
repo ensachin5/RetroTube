@@ -12,7 +12,14 @@ services:
       DB_PATH: /app/data/retrotube.db
       TEMP_DIR: /app/tmp
       MAX_CONCURRENT_JOBS: ${MAX_CONCURRENT_JOBS:-2}
-      MAX_VIDEO_MINUTES: ${MAX_VIDEO_MINUTES:-180}
+      MAX_VIDEO_MINUTES: ${MAX_VIDEO_MINUTES:-0}
+      MAX_FILE_SIZE_GB: ${MAX_FILE_SIZE_GB:-0}
+      MIN_FREE_DISK_GB: ${MIN_FREE_DISK_GB:-2}
+      FILE_TTL_MINUTES: ${FILE_TTL_MINUTES:-120}
+      MAX_PLAYLIST_ITEMS: ${MAX_PLAYLIST_ITEMS:-200}
+      BATCH_CONCURRENCY: ${BATCH_CONCURRENCY:-1}
+      BATCH_ITEM_DELAY_MS: ${BATCH_ITEM_DELAY_MS:-1000}
+      SERVER_SAVE_DIR: ${SERVER_SAVE_DIR:-}
       APP_PASSWORD: ${APP_PASSWORD:-}
       CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-3600}
       RATE_LIMIT_FETCH_PER_MIN: ${RATE_LIMIT_FETCH_PER_MIN:-20}
@@ -31,6 +38,13 @@ services:
       - retrotube_tmp:/app/tmp
     restart: unless-stopped
 
+# ==============================================================================
+# Volume Sizing Guidance:
+# - retrotube_data: Holds SQLite DB and format cache metadata (~100 MB to 1 GB).
+# - retrotube_tmp: Holds in-flight audio/video streams, ffmpeg merges, and ZIP files.
+#   Recommended size: At least 20 GB to 50 GB (or host NVMe bind mount) when downloading
+#   high-resolution 4K/8K media or large playlists with multiple simultaneous items.
+# ==============================================================================
 volumes:
   retrotube_data:
   retrotube_tmp:

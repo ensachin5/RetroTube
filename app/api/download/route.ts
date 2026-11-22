@@ -33,6 +33,6 @@ export const POST = withApiHandler({ route: "/api/download" }, async (request, c
   const env = getEnv();
   getRateLimiter().enforce("download", ctx.clientIp, env.RATE_LIMIT_DOWNLOAD_PER_MIN);
 
-  const result = downloadService.enqueue(body);
+  const result = await downloadService.enqueue(body);
   return jsonOk(result, ctx.requestId, 202);
 });

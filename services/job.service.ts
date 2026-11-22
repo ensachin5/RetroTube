@@ -7,20 +7,22 @@ import { getEnv } from "@/lib/env";
 import { AppError, ERROR_CODES, normalizeError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { formatsRepo } from "@/repositories/formats.repo";
+import { historyRepo } from "@/repositories/history.repo";
 import { jobsRepo, type JobStatus } from "@/repositories/jobs.repo";
 import { ffmpegService } from "./ffmpeg.service";
 import { ytdlpService } from "./ytdlp.service";
 
 export const ALLOWED_JOB_TRANSITIONS: Record<JobStatus, readonly JobStatus[]> = {
   queued: ["running", "failed", "cancelled"],
-  running: ["done", "failed", "cancelled"],
+  running: ["done", "failed", "cancelled", "paused"],
+  paused: ["queued", "running", "cancelled"],
   done: [],
   failed: [],
   cancelled: [],
 };
 
 export function canTransitionJobStatus(from: JobStatus, to: JobStatus): boolean {
-  return ALLOWED_JOB_TRANSITIONS[from].includes(to);
+  return ALLOWED_JOB_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
 export function assertValidJobTransition(from: JobStatus, to: JobStatus): void {
@@ -64,7 +66,9 @@ export interface SweepReport {
   clearedJobs: number;
 }
 
-const TEMP_SWEEP_MAX_AGE_MS = 30 * 60 * 1000;
+function getFileTtlMs(): number {
+  return (getEnv().FILE_TTL_MINUTES ?? 120) * 60 * 1000;
+}
 const AUDIO_CONVERSION_CONTAINERS = new Set(["mp3", "m4a", "opus", "flac", "wav"]);
 
 function isAudioConversionContainer(
@@ -170,6 +174,36 @@ class JobServiceImpl {
       this.emitter.off(eventName, listener);
     };
   }
+
+  public waitForJobCompletion(
+    jobId: string,
+    onProgress?: (event: JobProgressEvent) => void,
+  ): Promise<JobProgressEvent> {
+    const initial = this.getSnapshot(jobId);
+    if (
+      initial &&
+      (initial.status === "done" ||
+        initial.status === "failed" ||
+        initial.status === "cancelled")
+    ) {
+      return Promise.resolve(initial);
+    }
+
+    return new Promise((resolve) => {
+      const unsubscribe = this.subscribe(jobId, (event) => {
+        onProgress?.(event);
+        if (
+          event.status === "done" ||
+          event.status === "failed" ||
+          event.status === "cancelled"
+        ) {
+          unsubscribe();
+          resolve(event);
+        }
+      });
+    });
+  }
+
 
   public getSnapshot(jobId: string): JobProgressEvent | null {
     const live = this.latestSnapshots.get(jobId);
@@ -299,7 +333,7 @@ class JobServiceImpl {
     }
   }
 
-  public async runSweep(maxAgeMs = TEMP_SWEEP_MAX_AGE_MS): Promise<SweepReport> {
+  public async runSweep(maxAgeMs = getFileTtlMs()): Promise<SweepReport> {
     const tempDir = this.getTempDir();
     const now = Date.now();
     const activePaths = new Set(
@@ -357,7 +391,7 @@ class JobServiceImpl {
     return { deletedFiles, clearedJobs };
   }
 
-  public startPeriodicSweeper(intervalMs = TEMP_SWEEP_MAX_AGE_MS): void {
+  public startPeriodicSweeper(intervalMs = getFileTtlMs()): void {
     if (this.sweeperInterval) return;
     this.sweeperInterval = setInterval(() => {
       void this.runSweep();
@@ -376,7 +410,7 @@ class JobServiceImpl {
     sweep: SweepReport;
   }> {
     const recoveredJobs = jobsRepo.markStaleJobsAsServerRestart();
-    const sweep = await this.runSweep(TEMP_SWEEP_MAX_AGE_MS);
+    const sweep = await this.runSweep(getFileTtlMs());
     if (recoveredJobs > 0) {
       logger.warn("Marked stale jobs as failed after server restart", {
         recoveredJobs,
@@ -495,33 +529,44 @@ class JobServiceImpl {
         const bestAudio = selectBestAudioFormat(formats, videoContainer);
         const audioSelector = bestAudio?.formatId ?? "bestaudio";
 
-        reportProgress(0, "downloading_video");
-        await ytdlpService.downloadStream({
-          canonicalUrl,
-          formatSelector: job.sourceFormatId,
-          outputPath: rawVideoPath,
-          signal: controller.signal,
-          onProgress: (sample) => {
-            reportProgress(sample.pct * 0.6, "downloading_video", {
-              speed: sample.speed,
-              etaSec: sample.etaSec,
-            });
-          },
-        });
+        let videoPct = 0;
+        let audioPct = 0;
+        let lastSpeed: string | null = null;
+        let lastEta: number | null = null;
 
-        reportProgress(60, "downloading_audio");
-        await ytdlpService.downloadStream({
-          canonicalUrl,
-          formatSelector: audioSelector,
-          outputPath: rawAudioPath,
-          signal: controller.signal,
-          onProgress: (sample) => {
-            reportProgress(60 + sample.pct * 0.25, "downloading_audio", {
-              speed: sample.speed,
-              etaSec: sample.etaSec,
-            });
-          },
-        });
+        const updateParallelProgress = () => {
+          const combined = Math.min(84.9, (videoPct * 0.75 + audioPct * 0.25) * 0.85);
+          reportProgress(combined, "downloading", {
+            speed: lastSpeed,
+            etaSec: lastEta,
+          });
+        };
+
+        reportProgress(0, "downloading");
+        await Promise.all([
+          ytdlpService.downloadStream({
+            canonicalUrl,
+            formatSelector: job.sourceFormatId,
+            outputPath: rawVideoPath,
+            signal: controller.signal,
+            onProgress: (sample) => {
+              videoPct = sample.pct;
+              if (sample.speed) lastSpeed = sample.speed;
+              if (sample.etaSec !== null) lastEta = sample.etaSec;
+              updateParallelProgress();
+            },
+          }),
+          ytdlpService.downloadStream({
+            canonicalUrl,
+            formatSelector: audioSelector,
+            outputPath: rawAudioPath,
+            signal: controller.signal,
+            onProgress: (sample) => {
+              audioPct = sample.pct;
+              updateParallelProgress();
+            },
+          }),
+        ]);
 
         reportProgress(85, "merging");
         await ffmpegService.mergeVideoAndAudio({
@@ -572,6 +617,19 @@ class JobServiceImpl {
         tempFilepath: finalOutputPath,
         bytesTotal: stat.size,
       });
+
+      // Commit to local SQLite history immediately upon job completion
+      try {
+        historyRepo.upsertAndPrune({
+          jobId,
+          bytesSent: stat.size,
+        });
+      } catch (historyErr) {
+        logger.warn("Failed to persist completed job into local SQLite history", {
+          jobId,
+          error: historyErr,
+        });
+      }
 
       if (doneJob) {
         this.emitProgress({

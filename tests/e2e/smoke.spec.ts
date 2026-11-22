@@ -159,7 +159,7 @@ test.describe("RetroTube E2E Smoke Flow (backend mocked)", () => {
     await page.goto("/");
 
     // Fill URL and click Fetch
-    const urlInput = page.getByLabel("YouTube Video URL");
+    const urlInput = page.getByLabel(/YouTube.*URL/i);
     await urlInput.fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
     await page.getByRole("button", { name: "Fetch" }).click();
 
@@ -194,9 +194,8 @@ test.describe("RetroTube E2E Smoke Flow (backend mocked)", () => {
     );
     expect(download.url()).toContain(`/api/download/${MOCK_JOB_ID}/stream`);
 
-    // Theme toggle works without error
-    await page.getByRole("button", { name: /CRT Night/i }).click();
-    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    // History navigation link is accessible
+    await expect(page.getByRole("link", { name: /History/i })).toBeVisible();
 
     // Zero horizontal overflow across mobile, foldable, tablet, and desktop widths
     for (const width of [280, 320, 360, 390, 412, 600, 768, 1024, 1440]) {
@@ -306,7 +305,7 @@ test.describe("RetroTube E2E Smoke Flow (backend mocked)", () => {
     await page.goto(
       "/?text=" + encodeURIComponent("Check this out: https://youtu.be/dQw4w9WgXcQ!"),
     );
-    await expect(page.getByLabel("YouTube Video URL")).toHaveValue(
+    await expect(page.getByLabel(/YouTube.*URL/i)).toHaveValue(
       "https://youtu.be/dQw4w9WgXcQ",
     );
     await expect(

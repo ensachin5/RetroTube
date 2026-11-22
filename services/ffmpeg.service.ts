@@ -99,6 +99,8 @@ export const ffmpegService = {
 
     const args = [
       "-y",
+      "-threads",
+      "0",
       "-fflags",
       "+genpts",
       "-i",
@@ -184,6 +186,8 @@ export const ffmpegService = {
 
     const args = [
       "-y",
+      "-threads",
+      "0",
       "-i",
       params.inputPath,
       ...codecArgs,

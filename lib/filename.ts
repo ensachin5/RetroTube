@@ -68,6 +68,18 @@ export function buildSafeOutputFilename(params: {
   return tag ? `${base} [${tag}].${ext}` : `${base}.${ext}`;
 }
 
+export function buildNumberedBatchFilename(params: {
+  position: number;
+  title: string;
+  extension: string;
+}): string {
+  const pad = String(params.position).padStart(3, "0");
+  const base = sanitizeFilenameSegment(params.title);
+  const ext = sanitizeExtension(params.extension);
+  return `${pad} - ${base}.${ext}`;
+}
+
+
 function toAsciiFallback(filename: string): string {
   const ascii = filename
     .normalize("NFKD")

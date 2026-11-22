@@ -33,7 +33,7 @@
   --shadow-retro: 4px 4px 0 var(--shadow-color);
   --shadow-retro-lg: 6px 6px 0 var(--shadow-color);
 
-  --type-display: clamp(1.75rem, 4.5vw, 3rem);
-  --type-h2: clamp(1.25rem, 2.5vw, 1.65rem);
-  --type-h3: clamp(1.05rem, 1.8vw, 1.25rem);
+  --type-display: clamp(1.4rem, 5.5vw, 2.75rem);
+  --type-h2: clamp(1.15rem, 3.5vw, 1.65rem);
+  --type-h3: clamp(1rem, 2.5vw, 1.25rem);
 }

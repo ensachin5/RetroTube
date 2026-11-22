@@ -45,17 +45,19 @@ export const fetchService = {
       const rawInfo = await ytdlpService.inspectVideo(parsedUrl.canonicalUrl);
       const normalized = normalizeYtDlpMetadata(parsedUrl.youtubeId, rawInfo);
 
-      const maxDurationSec = env.MAX_VIDEO_MINUTES * 60;
-      if (normalized.video.durationSec > maxDurationSec) {
-        throw new AppError({
-          code: ERROR_CODES.VIDEO_TOO_LONG,
-          status: 422,
-          message: `This video is ${Math.ceil(normalized.video.durationSec / 60)} minutes long, exceeding the ${env.MAX_VIDEO_MINUTES}-minute limit.`,
-          details: {
-            durationSec: normalized.video.durationSec,
-            maxMinutes: env.MAX_VIDEO_MINUTES,
-          },
-        });
+      if (env.MAX_VIDEO_MINUTES > 0) {
+        const maxDurationSec = env.MAX_VIDEO_MINUTES * 60;
+        if (normalized.video.durationSec > maxDurationSec) {
+          throw new AppError({
+            code: ERROR_CODES.VIDEO_TOO_LONG,
+            status: 422,
+            message: `This video is ${Math.ceil(normalized.video.durationSec / 60)} minutes long, exceeding the ${env.MAX_VIDEO_MINUTES}-minute limit.`,
+            details: {
+              durationSec: normalized.video.durationSec,
+              maxMinutes: env.MAX_VIDEO_MINUTES,
+            },
+          });
+        }
       }
 
       const savedVideo = videosRepo.upsert({

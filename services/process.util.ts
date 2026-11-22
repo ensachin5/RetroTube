@@ -28,6 +28,7 @@ export interface SpawnedCommandOptions {
   command: string;
   args: string[];
   timeoutMs: number;
+  stallTimeoutMs?: number;
   signal?: AbortSignal;
   onStdoutLine?: (line: string) => void;
   onStderrLine?: (line: string) => void;
@@ -70,6 +71,7 @@ export function runSpawnedCommand(
     let aborted = false;
     let settled = false;
     let forceKillTimer: NodeJS.Timeout | undefined;
+    let stallTimer: NodeJS.Timeout | undefined;
 
     const terminateChild = () => {
       killProcessTree(child, "SIGTERM");
@@ -80,6 +82,18 @@ export function runSpawnedCommand(
         forceKillTimer.unref();
       }
     };
+
+    const resetStallTimer = () => {
+      if (!options.stallTimeoutMs || options.stallTimeoutMs <= 0) return;
+      if (stallTimer) clearTimeout(stallTimer);
+      stallTimer = setTimeout(() => {
+        timedOut = true;
+        terminateChild();
+      }, options.stallTimeoutMs);
+      stallTimer.unref();
+    };
+
+    resetStallTimer();
 
     const timeoutTimer = setTimeout(() => {
       timedOut = true;
@@ -95,12 +109,14 @@ export function runSpawnedCommand(
 
     const cleanup = () => {
       clearTimeout(timeoutTimer);
+      if (stallTimer) clearTimeout(stallTimer);
       if (forceKillTimer) clearTimeout(forceKillTimer);
       options.signal?.removeEventListener("abort", onAbort);
     };
 
     child.stdout?.setEncoding("utf8");
     child.stdout?.on("data", (chunk: string) => {
+      resetStallTimer();
       stdout += chunk;
       if (options.onStdoutLine) {
         stdoutRemainder += chunk;
@@ -114,6 +130,7 @@ export function runSpawnedCommand(
 
     child.stderr?.setEncoding("utf8");
     child.stderr?.on("data", (chunk: string) => {
+      resetStallTimer();
       stderr += chunk;
       if (options.onStderrLine) {
         stderrRemainder += chunk;

@@ -10,7 +10,22 @@ export const ALLOWED_YOUTUBE_HOSTS = new Set([
 ]);
 
 const YOUTUBE_ID_REGEX = /^[A-Za-z0-9_-]{11}$/;
+const PLAYLIST_ID_REGEX = /^[A-Za-z0-9_-]{2,64}$/;
 const HAS_SCHEME_REGEX = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
+
+export type YouTubeUrlType = "video" | "playlist" | "combined";
+
+export interface ParsedYouTubeUrl {
+  type: YouTubeUrlType;
+  videoId?: string;
+  playlistId?: string;
+  canonicalUrl: string;
+  canonicalVideoUrl?: string;
+  canonicalPlaylistUrl?: string;
+  hostname: string;
+  isShorts: boolean;
+  isMusic: boolean;
+}
 
 export interface ValidatedYouTubeUrl {
   youtubeId: string;
@@ -19,6 +34,7 @@ export interface ValidatedYouTubeUrl {
   isShorts: boolean;
   isMusic: boolean;
   hadPlaylistParam: boolean;
+  playlistId?: string;
 }
 
 function normalizeInputUrl(rawInput: string): URL {
@@ -148,30 +164,92 @@ function extractVideoIdFromUrl(url: URL): {
   return { videoId: null, isShorts: false };
 }
 
-export function validateAndParseYouTubeUrl(rawInput: string): ValidatedYouTubeUrl {
+function extractPlaylistIdFromUrl(url: URL): string | null {
+  const list = url.searchParams.get("list");
+  if (list && PLAYLIST_ID_REGEX.test(list)) {
+    return list;
+  }
+  return null;
+}
+
+export function parseYouTubeUrl(rawInput: string): ParsedYouTubeUrl {
   const parsed = normalizeInputUrl(rawInput);
   const host = parsed.hostname.toLowerCase();
   const isMusic = host === "music.youtube.com";
   const { videoId, isShorts } = extractVideoIdFromUrl(parsed);
+  const playlistId = extractPlaylistIdFromUrl(parsed);
 
-  const hasListParam =
-    parsed.searchParams.has("list") &&
-    (parsed.searchParams.get("list") ?? "").trim().length > 0;
+  const canonicalHost = isMusic ? "music.youtube.com" : "www.youtube.com";
+  const canonicalVideoUrl = videoId
+    ? `https://${canonicalHost}/watch?v=${videoId}`
+    : undefined;
+  const canonicalPlaylistUrl = playlistId
+    ? `https://${canonicalHost}/playlist?list=${playlistId}`
+    : undefined;
+
   const isPlaylistPath =
     parsed.pathname === "/playlist" ||
     parsed.pathname.startsWith("/playlist/") ||
     parsed.pathname === "/watch_videos";
 
-  // Reject playlist-only URLs (e.g. /playlist?list=... or /watch?list=... with no single video ID)
-  if (isPlaylistPath || (hasListParam && !videoId)) {
+  if (videoId && playlistId && !isPlaylistPath) {
+    return {
+      type: "combined",
+      videoId,
+      playlistId,
+      canonicalUrl: `https://${canonicalHost}/watch?v=${videoId}&list=${playlistId}`,
+      canonicalVideoUrl,
+      canonicalPlaylistUrl,
+      hostname: host,
+      isShorts,
+      isMusic,
+    };
+  }
+
+  if (playlistId || isPlaylistPath) {
+    return {
+      type: "playlist",
+      playlistId: playlistId ?? "watch_videos",
+      canonicalUrl: canonicalPlaylistUrl ?? rawInput,
+      canonicalPlaylistUrl: canonicalPlaylistUrl ?? rawInput,
+      hostname: host,
+      isShorts: false,
+      isMusic,
+    };
+  }
+
+  if (videoId) {
+    return {
+      type: "video",
+      videoId,
+      canonicalUrl: canonicalVideoUrl!,
+      canonicalVideoUrl,
+      hostname: host,
+      isShorts,
+      isMusic,
+    };
+  }
+
+  throw new AppError({
+    code: ERROR_CODES.INVALID_URL,
+    status: 400,
+    message: "Could not find a valid YouTube video ID or playlist ID in that URL.",
+  });
+}
+
+export function validateAndParseYouTubeUrl(rawInput: string): ValidatedYouTubeUrl {
+  const parsed = parseYouTubeUrl(rawInput);
+
+  if (parsed.type === "playlist") {
     throw new AppError({
       code: ERROR_CODES.PLAYLIST_NOT_SUPPORTED,
       status: 400,
-      message: "Playlist URLs are not supported in v1. Please pick a single video URL.",
+      message:
+        "Playlist URLs are not supported on this endpoint. Please use the playlist fetch endpoint.",
     });
   }
 
-  if (!videoId) {
+  if (!parsed.videoId) {
     throw new AppError({
       code: ERROR_CODES.INVALID_URL,
       status: 400,
@@ -179,13 +257,13 @@ export function validateAndParseYouTubeUrl(rawInput: string): ValidatedYouTubeUr
     });
   }
 
-  const canonicalHost = isMusic ? "music.youtube.com" : "www.youtube.com";
   return {
-    youtubeId: videoId,
-    canonicalUrl: `https://${canonicalHost}/watch?v=${videoId}`,
-    hostname: host,
-    isShorts,
-    isMusic,
-    hadPlaylistParam: hasListParam,
+    youtubeId: parsed.videoId,
+    canonicalUrl: parsed.canonicalVideoUrl ?? parsed.canonicalUrl,
+    hostname: parsed.hostname,
+    isShorts: parsed.isShorts,
+    isMusic: parsed.isMusic,
+    hadPlaylistParam: Boolean(parsed.playlistId),
+    playlistId: parsed.playlistId,
   };
 }

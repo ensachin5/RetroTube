@@ -20,6 +20,7 @@ import {
 } from "@/src/lib/format-grouping";
 import type { FetchVideoResponseDto } from "@/services/format.normalizer";
 import type { JobProgressEvent } from "@/services/job.service";
+import type { PlaylistDTO, PlaylistFetchResult } from "@/services/playlist.service";
 
 const FormatResultsPanel = dynamic(
   () =>
@@ -35,6 +36,14 @@ const FormatResultsPanel = dynamic(
 
 const JobProgressPanel = dynamic(() =>
   import("@/src/components/JobProgressPanel").then((mod) => mod.JobProgressPanel),
+);
+
+const PlaylistPicker = dynamic(() =>
+  import("@/src/components/PlaylistPicker").then((mod) => mod.PlaylistPicker),
+);
+
+const BatchProgressPanel = dynamic(() =>
+  import("@/src/components/BatchProgressPanel").then((mod) => mod.BatchProgressPanel),
 );
 
 interface ApiErrorPayload {
@@ -58,12 +67,29 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
     message: string;
   } | null>(null);
   const [result, setResult] = useState<FetchVideoResponseDto | null>(null);
-  const [activeTab, setActiveTab] = useState<ActiveTab>("video");
+  const [playlistResult, setPlaylistResult] = useState<PlaylistDTO | null>(null);
+  const [combinedPrompt, setCombinedPrompt] = useState<{
+    url: string;
+    videoId?: string;
+    playlistId?: string;
+  } | null>(null);
 
+  const [activeTab, setActiveTab] = useState<ActiveTab>("video");
   const [selectedAction, setSelectedAction] = useState<SelectedAction | null>(null);
   const [startingJob, setStartingJob] = useState(false);
   const [activeJob, setActiveJob] = useState<ActiveDownloadJob | null>(null);
-  const [jobSnapshot, setJobSnapshot] = useState<JobProgressEvent | null>(null);
+  const [, setJobSnapshot] = useState<JobProgressEvent | null>(null);
+  const [activeBatchId, setActiveBatchId] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return localStorage.getItem("retrotube_active_batch_id");
+      } catch {
+        // Ignore
+      }
+    }
+    return null;
+  });
+
   const [toast, setToast] = useState<{
     message: string;
     tone: "info" | "error" | "success";
@@ -81,10 +107,12 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
     [result?.audioFormats],
   );
 
-  const handleFetch = useCallback(async (url: string) => {
+  const fetchSingleVideo = useCallback(async (url: string) => {
     setLastSubmittedUrl(url);
     setFetching(true);
     setFetchError(null);
+    setPlaylistResult(null);
+    setCombinedPrompt(null);
 
     try {
       const response = await fetch("/api/fetch", {
@@ -135,6 +163,75 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
     }
   }, []);
 
+  const fetchPlaylist = useCallback(
+    async (url: string, force = false) => {
+      setLastSubmittedUrl(url);
+      setFetching(true);
+      setFetchError(null);
+      setResult(null);
+      setCombinedPrompt(null);
+
+      try {
+        const response = await fetch("/api/playlist/fetch", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url, forcePlaylist: force }),
+        });
+
+        const payload = (await response.json()) as PlaylistFetchResult & ApiErrorPayload;
+        if (!response.ok) {
+          setFetchError({
+            code: payload.error?.code ?? "INTERNAL_ERROR",
+            message: payload.error?.message ?? "Failed to fetch playlist metadata.",
+          });
+          setPlaylistResult(null);
+          return;
+        }
+
+        if (payload.isCombined && !force) {
+          setCombinedPrompt({
+            url,
+            videoId: payload.videoId,
+            playlistId: payload.playlistId,
+          });
+          return;
+        }
+
+        if (payload.playlist) {
+          setPlaylistResult(payload.playlist);
+        }
+      } catch {
+        setFetchError({
+          code: "INTERNAL_ERROR",
+          message: "Network error while fetching playlist metadata.",
+        });
+      } finally {
+        setFetching(false);
+      }
+    },
+    [],
+  );
+
+  const handleFetch = useCallback(
+    async (url: string) => {
+      const lower = url.toLowerCase();
+      const hasList = lower.includes("list=") || lower.includes("/playlist");
+      const hasVideo =
+        lower.includes("v=") || lower.includes("youtu.be/") || lower.includes("/shorts/");
+
+      if (hasVideo) {
+        // Fast path: Immediately load the video so the user sees formats and download button with zero delay
+        await fetchSingleVideo(url);
+      } else if (hasList) {
+        // Pure playlist URL: Load the playlist directly
+        await fetchPlaylist(url, true);
+      } else {
+        await fetchSingleVideo(url);
+      }
+    },
+    [fetchPlaylist, fetchSingleVideo],
+  );
+
   useEffect(() => {
     if (initialUrl && !autoFetchedInitialRef.current) {
       autoFetchedInitialRef.current = true;
@@ -158,6 +255,7 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
           ? {
               videoId: result.video.id,
               formatId: action.format.id,
+              targetContainer: action.format.container,
             }
           : {
               videoId: result.video.id,
@@ -172,25 +270,30 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
         body: JSON.stringify(requestBody),
       });
 
-      const data = (await response.json()) as ActiveDownloadJob & ApiErrorPayload;
+      const payload = await response.json();
       if (!response.ok) {
-        const copy = getFriendlyErrorCopy(data.error?.code, data.error?.message);
-        setToast({ message: `${copy.title}: ${copy.message}`, tone: "error" });
+        setToast({
+          message: payload.error?.message ?? "Failed to queue download.",
+          tone: "error",
+        });
         return;
       }
 
-      setJobSnapshot({
-        jobId: data.jobId,
-        status: "queued",
-        progressPct: 0,
-        stage: "queued",
-        outputFilename: data.outputFilename,
-        streamUrl: data.streamUrl,
+      setActiveJob({
+        jobId: payload.jobId,
+        outputFilename: payload.outputFilename,
+        needsMerge: payload.needsMerge,
+        eventsUrl: payload.eventsUrl,
+        streamUrl: payload.streamUrl,
       });
-      setActiveJob(data);
+
+      setToast({
+        message: "Job queued to tape deck.",
+        tone: "success",
+      });
     } catch {
       setToast({
-        message: "Failed to queue download job. Check your connection.",
+        message: "Could not communicate with the tape recorder.",
         tone: "error",
       });
     } finally {
@@ -198,34 +301,87 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
     }
   };
 
-  const errorCopy = fetchError
-    ? getFriendlyErrorCopy(fetchError.code, fetchError.message)
-    : null;
+  const handleStartBatch = async (params: {
+    selectedItemIds: string[];
+    qualityPreset: string;
+    kind: "video" | "audio";
+    targetContainer: string;
+  }) => {
+    if (!playlistResult) return;
+    setStartingJob(true);
 
-  const isJobRunning =
-    activeJob !== null &&
-    jobSnapshot?.status !== "done" &&
-    jobSnapshot?.status !== "failed" &&
-    jobSnapshot?.status !== "cancelled";
+    try {
+      const response = await fetch("/api/batch", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          playlistId: playlistResult.id,
+          sourceUrl: lastSubmittedUrl,
+          title: playlistResult.title,
+          channel: playlistResult.channel,
+          selectedItemIds: params.selectedItemIds,
+          items: playlistResult.items,
+          qualityPreset: params.qualityPreset,
+          kind: params.kind,
+          targetContainer: params.targetContainer,
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        setToast({
+          message: payload.error?.message ?? "Failed to start batch.",
+          tone: "error",
+        });
+        return;
+      }
+
+      const newBatchId = payload.batchId;
+      setActiveBatchId(newBatchId);
+      try {
+        localStorage.setItem("retrotube_active_batch_id", newBatchId);
+      } catch {
+        // Ignore
+      }
+
+      setPlaylistResult(null);
+      setToast({
+        message: "Tape batch recorder started.",
+        tone: "success",
+      });
+    } catch {
+      setToast({
+        message: "Could not start batch.",
+        tone: "error",
+      });
+    } finally {
+      setStartingJob(false);
+    }
+  };
+
+  const errorCopy = fetchError ? getFriendlyErrorCopy(fetchError.code) : null;
 
   return (
     <div className="space-y-6 pb-24 md:pb-8">
+      {/* Hero Section with URL Input */}
       <section aria-labelledby="hero-heading">
         <Card className="p-4 sm:p-6 space-y-5">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="mustard">Deck v1</Badge>
+              <Badge tone="mustard">Deck v2</Badge>
+              <Badge tone="outline">Playlist & Batch Ready</Badge>
             </div>
             <h1
               id="hero-heading"
               className="font-display font-black tracking-tight text-[var(--text-ink)]"
               style={{ fontSize: "var(--type-display)", lineHeight: 1.08 }}
             >
-              Pull any YouTube track to tape.
+              Pull any YouTube track or playlist to tape.
             </h1>
             <p className="max-w-2xl text-sm sm:text-base text-[var(--text-muted)]">
-              Inspect every video and audio stream, splice high-res video with best audio
-              automatically, or transcode to MP3, M4A, Opus, FLAC, and WAV.
+              Inspect single video streams, batch download whole playlists with quality
+              presets, stream uncompressed ZIP archives on the fly, or convert to MP3,
+              M4A, Opus, and FLAC.
             </p>
           </div>
 
@@ -238,8 +394,9 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
         </Card>
       </section>
 
+      {/* Loading Skeleton */}
       {fetching ? (
-        <section aria-label="Loading video metadata" className="space-y-4">
+        <section aria-label="Loading metadata" className="space-y-4">
           <Card className="p-4 sm:p-5 space-y-4">
             <div className="flex items-center justify-between">
               <TapeReelLoader label="Scanning tape index..." />
@@ -259,6 +416,42 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
         </section>
       ) : null}
 
+      {/* Combined URL Prompt */}
+      {combinedPrompt && !fetching ? (
+        <section aria-label="Combined URL prompt">
+          <Card className="p-4 sm:p-6 space-y-4 border-2 border-[var(--accent-mustard)] bg-[var(--bg-surface)]">
+            <div className="flex items-center gap-2">
+              <Badge tone="mustard">Dual Link Detected</Badge>
+              <h2 className="font-display text-base sm:text-lg font-bold text-[var(--text-ink)]">
+                Track + Playlist Choice
+              </h2>
+            </div>
+            <p className="text-sm text-[var(--text-ink)]">
+              This link points to a single video that also belongs to a playlist. What
+              would you like to load?
+            </p>
+            <div className="flex flex-wrap gap-3 pt-1">
+              <Button
+                variant="primary"
+                onClick={() => void fetchPlaylist(combinedPrompt.url, true)}
+              >
+                📜 Load Whole Playlist
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => void fetchSingleVideo(combinedPrompt.url)}
+              >
+                🎬 Load Single Track
+              </Button>
+              <Button variant="ghost" onClick={() => setCombinedPrompt(null)}>
+                Cancel
+              </Button>
+            </div>
+          </Card>
+        </section>
+      ) : null}
+
+      {/* Error Alert */}
       {errorCopy && fetchError ? (
         <section aria-label="Fetch error">
           <Card
@@ -296,13 +489,44 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
               </div>
             </div>
             <p className="text-sm sm:text-base text-[var(--text-ink)]">
-              {errorCopy.message}
+              {fetchError.message || errorCopy.message}
             </p>
           </Card>
         </section>
       ) : null}
 
-      {activeJob ? (
+      {/* Active Batch Progress Screen */}
+      {activeBatchId ? (
+        <section aria-label="Active batch download progress">
+          <BatchProgressPanel
+            batchId={activeBatchId}
+            onDismiss={() => {
+              setActiveBatchId(null);
+              try {
+                localStorage.removeItem("retrotube_active_batch_id");
+              } catch {
+                // Ignore
+              }
+            }}
+          />
+        </section>
+      ) : null}
+
+      {/* Playlist Picker View */}
+      {playlistResult && !fetching && !activeBatchId ? (
+        <section aria-label="Playlist selection deck">
+          <PlaylistPicker
+            playlist={playlistResult}
+            sourceUrl={lastSubmittedUrl}
+            onStartBatch={(params) => void handleStartBatch(params)}
+            onCancel={() => setPlaylistResult(null)}
+            loading={startingJob}
+          />
+        </section>
+      ) : null}
+
+      {/* Single Video Active Job Progress */}
+      {activeJob && !activeBatchId ? (
         <section aria-label="Active download progress">
           <JobProgressPanel
             job={activeJob}
@@ -315,7 +539,8 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
         </section>
       ) : null}
 
-      {result && !fetching ? (
+      {/* Single Video Results Panel */}
+      {result && !fetching && !playlistResult && !activeBatchId ? (
         <FormatResultsPanel
           result={result}
           activeTab={activeTab}
@@ -326,66 +551,9 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
           onSelectAction={setSelectedAction}
           onStartDownload={(action) => void startDownload(action)}
           startingJob={startingJob}
+          sourceUrl={lastSubmittedUrl}
+          onLoadPlaylist={(targetUrl) => void fetchPlaylist(targetUrl, true)}
         />
-      ) : null}
-
-      {result || activeJob ? (
-        <div className="md:hidden fixed inset-x-0 bottom-0 z-30 border-t-2 border-[var(--border-ink)] bg-[var(--bg-surface)] px-3 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_0_var(--shadow-color)]">
-          {isJobRunning && activeJob ? (
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-display text-xs font-bold uppercase tracking-wider">
-                  {Math.round(jobSnapshot?.progressPct ?? 0)}% ·{" "}
-                  {activeJob.outputFilename}
-                </p>
-              </div>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={async () => {
-                  await fetch(`/api/jobs/${activeJob.jobId}/cancel`, {
-                    method: "POST",
-                  }).catch(() => undefined);
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-          ) : jobSnapshot?.status === "done" && activeJob ? (
-            <div className="flex items-center justify-between gap-3">
-              <p className="truncate font-display text-xs font-bold uppercase">
-                Ready: {activeJob.outputFilename}
-              </p>
-              <a
-                href={jobSnapshot.streamUrl ?? activeJob.streamUrl}
-                download={activeJob.outputFilename}
-                className="retro-btn min-h-11 inline-flex items-center justify-center rounded-md bg-[var(--accent-teal)] px-4 py-2 font-display text-xs font-bold uppercase text-[var(--on-teal)] no-underline shrink-0"
-              >
-                Save File
-              </a>
-            </div>
-          ) : selectedAction && result ? (
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                  Selected Quality
-                </p>
-                <p className="truncate font-display text-sm font-bold text-[var(--text-ink)]">
-                  {selectedAction.label}
-                </p>
-              </div>
-              <Button
-                variant="primary"
-                size="md"
-                disabled={startingJob}
-                onClick={() => void startDownload(selectedAction)}
-                className="shrink-0"
-              >
-                {startingJob ? "Starting..." : "Download"}
-              </Button>
-            </div>
-          ) : null}
-        </div>
       ) : null}
 
       {toast ? (

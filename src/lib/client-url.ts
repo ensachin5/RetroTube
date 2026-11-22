@@ -14,6 +14,8 @@ export type ClientUrlValidationResult =
   | {
       ok: true;
       youtubeId: string;
+      playlistId?: string;
+      isPlaylist?: boolean;
       canonicalUrl: string;
       hadPlaylistParam: boolean;
     }
@@ -128,33 +130,41 @@ export function validateYouTubeUrlClient(rawInput: string): ClientUrlValidationR
   const hasListParam =
     parsed.searchParams.has("list") &&
     (parsed.searchParams.get("list") ?? "").trim().length > 0;
+  const listId = parsed.searchParams.get("list")?.trim();
   const isPlaylistPath =
     parsed.pathname === "/playlist" ||
     parsed.pathname.startsWith("/playlist/") ||
     parsed.pathname === "/watch_videos";
 
+  const canonicalHost =
+    host === "music.youtube.com" ? "music.youtube.com" : "www.youtube.com";
+
   if (isPlaylistPath || (hasListParam && !videoId)) {
-    return {
-      ok: false,
-      code: "PLAYLIST_NOT_SUPPORTED",
-      message: "Playlist URLs are not supported in v1. Please pick a single video URL.",
-    };
+    if (listId) {
+      return {
+        ok: true,
+        youtubeId: "",
+        playlistId: listId,
+        isPlaylist: true,
+        canonicalUrl: `https://${canonicalHost}/playlist?list=${listId}`,
+        hadPlaylistParam: true,
+      };
+    }
   }
 
   if (!videoId) {
     return {
       ok: false,
       code: "INVALID_URL",
-      message: "Could not find a valid 11-character YouTube video ID in that URL.",
+      message: "Could not find a valid YouTube video ID or playlist ID in that URL.",
     };
   }
-
-  const canonicalHost =
-    host === "music.youtube.com" ? "music.youtube.com" : "www.youtube.com";
 
   return {
     ok: true,
     youtubeId: videoId,
+    playlistId: listId,
+    isPlaylist: false,
     canonicalUrl: `https://${canonicalHost}/watch?v=${videoId}`,
     hadPlaylistParam: hasListParam,
   };

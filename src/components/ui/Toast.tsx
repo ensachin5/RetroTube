@@ -18,7 +18,7 @@ export function Toast({ message, tone = "info", onDismiss }: ToastProps) {
     <div
       role={tone === "error" ? "alert" : "status"}
       aria-live={tone === "error" ? "assertive" : "polite"}
-      className={`fixed right-3 bottom-20 md:bottom-5 z-50 max-w-sm rounded-lg border-2 p-3 shadow-[var(--shadow-retro)] flex items-center gap-3 ${toneClasses}`}
+      className={`fixed inset-x-3 sm:inset-x-auto sm:right-5 bottom-[max(5rem,env(safe-area-inset-bottom))] md:bottom-5 z-50 sm:max-w-md rounded-lg border-2 p-3 shadow-[var(--shadow-retro)] flex items-center justify-between gap-3 ${toneClasses}`}
     >
       <p className="text-sm font-medium text-[var(--text-ink)]">{message}</p>
       <button

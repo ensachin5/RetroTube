@@ -6,6 +6,7 @@ export type ButtonSize = "sm" | "md" | "lg";
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  loading?: boolean;
   children: ReactNode;
 }
 
@@ -30,6 +31,8 @@ export function Button({
   size = "md",
   className = "",
   type = "button",
+  loading = false,
+  disabled,
   children,
   ...props
 }: ButtonProps) {
@@ -41,10 +44,18 @@ export function Button({
   return (
     <button
       type={type}
+      disabled={disabled || loading}
       className={`${baseClass} ${VARIANT_CLASSES[variant]} ${SIZE_CLASSES[size]} ${className}`.trim()}
       {...props}
     >
-      {children}
+      {loading ? (
+        <span className="inline-flex items-center gap-2">
+          <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          {children}
+        </span>
+      ) : (
+        children
+      )}
     </button>
   );
 }

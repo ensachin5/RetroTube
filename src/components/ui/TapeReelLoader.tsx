@@ -1,14 +1,20 @@
 export interface TapeReelLoaderProps {
   label?: string;
+  spinning?: boolean;
+  className?: string;
 }
 
-export function TapeReelLoader({ label = "Loading tape..." }: TapeReelLoaderProps) {
+export function TapeReelLoader({
+  label = "Loading tape...",
+  spinning = true,
+  className = "",
+}: TapeReelLoaderProps) {
   return (
     <div
       role="status"
       aria-live="polite"
       aria-label={label}
-      className="inline-flex items-center gap-3"
+      className={`inline-flex items-center gap-3 ${className}`.trim()}
     >
       <svg
         width="56"
@@ -38,7 +44,7 @@ export function TapeReelLoader({ label = "Loading tape..." }: TapeReelLoaderProp
           stroke="currentColor"
           strokeWidth="1.5"
         />
-        <g className="tape-reel-spin" style={{ transformOrigin: "17px 14px" }}>
+        <g className={spinning ? "tape-reel-spin" : ""} style={{ transformOrigin: "17px 14px" }}>
           <circle
             cx="17"
             cy="14"
