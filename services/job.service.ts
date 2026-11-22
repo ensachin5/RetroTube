@@ -228,10 +228,10 @@ class JobServiceImpl {
                 : "queued",
       ...(job.status === "done"
         ? {
-            streamUrl: `/api/download/${job.id}/stream`,
-            outputFilename: job.outputFilename,
-            bytesTotal: job.bytesTotal,
-          }
+          streamUrl: `/api/download/${job.id}/stream`,
+          outputFilename: job.outputFilename,
+          bytesTotal: job.bytesTotal,
+        }
         : {}),
       ...(job.errorCode ? { errorCode: job.errorCode } : {}),
       ...(job.errorMessage ? { errorMessage: job.errorMessage } : {}),
