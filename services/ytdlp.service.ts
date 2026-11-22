@@ -1,8 +1,39 @@
+import fs from "node:fs";
+import path from "node:path";
 import { ensureYtDlpBinary } from "@/lib/binaries";
-import { getEnv } from "@/lib/env";
+import { getEnv, type AppEnv } from "@/lib/env";
 import { AppError, ERROR_CODES } from "@/lib/errors";
 import type { RawYtDlpInfo } from "./format.normalizer";
 import { runSpawnedCommand } from "./process.util";
+
+export function resolveCookiesArgs(env: AppEnv): string[] {
+  if (env.YTDLP_COOKIES_FILE && fs.existsSync(env.YTDLP_COOKIES_FILE)) {
+    return ["--cookies", env.YTDLP_COOKIES_FILE];
+  }
+  if (env.YTDLP_COOKIES_TEXT) {
+    const tmpCookiePath = path.join("/tmp", "cookies.txt");
+    try {
+      fs.writeFileSync(tmpCookiePath, env.YTDLP_COOKIES_TEXT, { encoding: "utf8" });
+      return ["--cookies", tmpCookiePath];
+    } catch {
+      // Ignore write error
+    }
+  }
+  if (env.YTDLP_COOKIES_BASE64) {
+    const tmpCookiePath = path.join("/tmp", "cookies.txt");
+    try {
+      const decoded = Buffer.from(env.YTDLP_COOKIES_BASE64, "base64").toString("utf8");
+      fs.writeFileSync(tmpCookiePath, decoded, { encoding: "utf8" });
+      return ["--cookies", tmpCookiePath];
+    } catch {
+      // Ignore write error
+    }
+  }
+  if (env.YTDLP_COOKIES_FROM_BROWSER) {
+    return ["--cookies-from-browser", env.YTDLP_COOKIES_FROM_BROWSER];
+  }
+  return [];
+}
 
 export interface DownloadProgressSample {
   pct: number;
@@ -180,21 +211,18 @@ export const ytdlpService = {
       "--skip-download",
       "--remote-components",
       "ejs:github",
+      "--js-runtimes",
+      "node",
       "--no-write-comments",
       "--no-write-thumbnail",
       "--no-write-subs",
       "--no-write-auto-subs",
       "--extractor-args",
-      "youtube:skip=translated_subs,comments",
+      "youtube:player_client=android,web;skip=translated_subs,comments",
       "--socket-timeout",
       "10",
     ];
-    if (env.YTDLP_COOKIES_FILE) {
-      args.push("--cookies", env.YTDLP_COOKIES_FILE);
-    }
-    if (env.YTDLP_COOKIES_FROM_BROWSER) {
-      args.push("--cookies-from-browser", env.YTDLP_COOKIES_FROM_BROWSER);
-    }
+    args.push(...resolveCookiesArgs(env));
     if (env.YTDLP_PROXY) {
       args.push("--proxy", env.YTDLP_PROXY);
     }
@@ -288,22 +316,19 @@ export const ytdlpService = {
       "--skip-download",
       "--remote-components",
       "ejs:github",
+      "--js-runtimes",
+      "node",
       "--ignore-errors",
       "--no-write-comments",
       "--no-write-thumbnail",
       "--no-write-subs",
       "--no-write-auto-subs",
       "--extractor-args",
-      "youtube:skip=translated_subs,comments",
+      "youtube:player_client=android,web;skip=translated_subs,comments",
       "--socket-timeout",
       "10",
     ];
-    if (env.YTDLP_COOKIES_FILE) {
-      args.push("--cookies", env.YTDLP_COOKIES_FILE);
-    }
-    if (env.YTDLP_COOKIES_FROM_BROWSER) {
-      args.push("--cookies-from-browser", env.YTDLP_COOKIES_FROM_BROWSER);
-    }
+    args.push(...resolveCookiesArgs(env));
     if (env.YTDLP_PROXY) {
       args.push("--proxy", env.YTDLP_PROXY);
     }
@@ -395,6 +420,8 @@ export const ytdlpService = {
       "--continue",
       "--remote-components",
       "ejs:github",
+      "--js-runtimes",
+      "node",
       "--no-warnings",
       "--concurrent-fragments",
       String(env.YTDLP_CONCURRENT_FRAGMENTS),
@@ -406,19 +433,14 @@ export const ytdlpService = {
       "5",
       "--no-mtime",
       "--extractor-args",
-      "youtube:skip=translated_subs,comments",
+      "youtube:player_client=android,web;skip=translated_subs,comments",
     ];
 
     if (env.YTDLP_HTTP_CHUNK_SIZE && env.YTDLP_HTTP_CHUNK_SIZE !== "none") {
       args.push("--http-chunk-size", env.YTDLP_HTTP_CHUNK_SIZE);
     }
 
-    if (env.YTDLP_COOKIES_FILE) {
-      args.push("--cookies", env.YTDLP_COOKIES_FILE);
-    }
-    if (env.YTDLP_COOKIES_FROM_BROWSER) {
-      args.push("--cookies-from-browser", env.YTDLP_COOKIES_FROM_BROWSER);
-    }
+    args.push(...resolveCookiesArgs(env));
     if (env.YTDLP_PROXY) {
       args.push("--proxy", env.YTDLP_PROXY);
     }
