@@ -1,0 +1,116 @@
+{
+  "id": "dQw4w9WgXcQ",
+  "title": "RetroTube Test Video: 8K / HDR / Synthwave",
+  "channel": "Retro Channel",
+  "uploader": "Retro Channel",
+  "duration": 180,
+  "upload_date": "20250412",
+  "thumbnail": "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
+  "is_live": false,
+  "live_status": "not_live",
+  "formats": [
+    {
+      "format_id": "sb0",
+      "ext": "mhtml",
+      "protocol": "mhtml",
+      "vcodec": "none",
+      "acodec": "none",
+      "format_note": "storyboard"
+    },
+    {
+      "format_id": "18",
+      "ext": "mp4",
+      "vcodec": "avc1.42001E",
+      "acodec": "mp4a.40.2",
+      "width": 640,
+      "height": 360,
+      "fps": 30,
+      "tbr": 520,
+      "filesize": 11700000,
+      "dynamic_range": "SDR",
+      "format_note": "360p"
+    },
+    {
+      "format_id": "22",
+      "ext": "mp4",
+      "vcodec": "avc1.64001F",
+      "acodec": "mp4a.40.2",
+      "width": 1280,
+      "height": 720,
+      "fps": 30,
+      "tbr": 1800,
+      "filesize": 40500000,
+      "dynamic_range": "SDR",
+      "format_note": "720p"
+    },
+    {
+      "format_id": "299",
+      "ext": "mp4",
+      "vcodec": "avc1.64002A",
+      "acodec": "none",
+      "width": 1920,
+      "height": 1080,
+      "fps": 60,
+      "tbr": 5400,
+      "filesize_approx": 121500000,
+      "dynamic_range": "SDR",
+      "format_note": "1080p60"
+    },
+    {
+      "format_id": "299",
+      "ext": "mp4",
+      "vcodec": "avc1.64002A",
+      "acodec": "none",
+      "width": 1920,
+      "height": 1080,
+      "fps": 60,
+      "tbr": 5400,
+      "filesize": 121500000,
+      "dynamic_range": "SDR",
+      "format_note": "1080p60"
+    },
+    {
+      "format_id": "337",
+      "ext": "webm",
+      "vcodec": "vp9.2",
+      "acodec": "none",
+      "width": 3840,
+      "height": 2160,
+      "fps": 60,
+      "tbr": 18000,
+      "dynamic_range": "HDR10",
+      "format_note": "2160p60 HDR"
+    },
+    {
+      "format_id": "571",
+      "ext": "mp4",
+      "vcodec": "av01.0.17M.10",
+      "acodec": "none",
+      "width": 7680,
+      "height": 4320,
+      "fps": 60,
+      "tbr": 32000,
+      "filesize": 720000000,
+      "dynamic_range": "HDR10",
+      "format_note": "4320p60 HDR"
+    },
+    {
+      "format_id": "140",
+      "ext": "m4a",
+      "vcodec": "none",
+      "acodec": "mp4a.40.2",
+      "abr": 128,
+      "filesize": 2880000,
+      "format_note": "medium"
+    },
+    {
+      "format_id": "251",
+      "ext": "webm",
+      "vcodec": "none",
+      "acodec": "opus",
+      "abr": 160,
+      "filesize_approx": 3600000,
+      "format_note": "medium"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+:root {
+  color-scheme: light;
+
+  --bg-canvas: #f6f0e4;
+  --bg-surface: #fbf7ee;
+  --bg-surface-alt: #efe7d6;
+
+  --text-ink: #141210;
+  --text-muted: #4d463e;
+
+  --border-ink: #141210;
+  --shadow-color: #141210;
+
+  --accent-tomato: #b83628;
+  --on-tomato: #ffffff;
+
+  --accent-mustard: #e2a631;
+  --on-mustard: #141210;
+
+  --accent-teal: #16635c;
+  --on-teal: #ffffff;
+
+  --bg-error: #fbeae7;
+  --border-error: #b83628;
+
+  --bg-success: #e5f3f1;
+  --border-success: #16635c;
+
+  --halftone-dot: rgba(20, 18, 16, 0.065);
+  --grain-opacity: 0.04;
+
+  --shadow-retro-sm: 2px 2px 0 var(--shadow-color);
+  --shadow-retro: 4px 4px 0 var(--shadow-color);
+  --shadow-retro-lg: 6px 6px 0 var(--shadow-color);
+
+  --type-display: clamp(1.75rem, 4.5vw, 3rem);
+  --type-h2: clamp(1.25rem, 2.5vw, 1.65rem);
+  --type-h3: clamp(1.05rem, 1.8vw, 1.25rem);
+}

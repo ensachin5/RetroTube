@@ -1,0 +1,137 @@
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+  background-color: var(--bg-canvas);
+  color: var(--text-ink);
+  font-family:
+    var(--font-manrope),
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+.font-display {
+  font-family: var(--font-satoshi), var(--font-manrope), system-ui, sans-serif;
+}
+
+/* Visible high-contrast focus ring across both themes */
+:focus-visible {
+  outline: 3px solid var(--accent-teal);
+  outline-offset: 2px;
+}
+
+/* Halftone dot matrix & paper texture */
+.retro-backdrop {
+  position: relative;
+  background-color: var(--bg-canvas);
+  background-image: radial-gradient(var(--halftone-dot) 1.15px, transparent 1.15px);
+  background-size: 16px 16px;
+}
+
+.retro-card {
+  background-color: var(--bg-surface);
+  border: 2px solid var(--border-ink);
+  box-shadow: var(--shadow-retro);
+}
+
+.retro-card-alt {
+  background-color: var(--bg-surface-alt);
+  border: 2px solid var(--border-ink);
+  box-shadow: var(--shadow-retro-sm);
+}
+
+.retro-btn {
+  border: 2px solid var(--border-ink);
+  box-shadow: var(--shadow-retro);
+  transition:
+    transform 90ms ease,
+    box-shadow 90ms ease;
+}
+
+.retro-btn:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0 var(--shadow-color);
+}
+
+.retro-btn:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--shadow-color);
+}
+
+.retro-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: 2px 2px 0 var(--shadow-color);
+}
+
+.retro-input {
+  background-color: var(--bg-surface);
+  color: var(--text-ink);
+  border: 2px solid var(--border-ink);
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.08);
+  font-size: 1rem; /* >= 16px prevents iOS Safari auto-zoom */
+}
+
+.retro-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+/* VHS segmented tracking progress bar */
+@keyframes vhs-tracking {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 28px 0;
+  }
+}
+
+.vhs-tracking-fill {
+  background-image: repeating-linear-gradient(
+    -55deg,
+    var(--accent-teal) 0px,
+    var(--accent-teal) 10px,
+    var(--accent-mustard) 10px,
+    var(--accent-mustard) 14px
+  );
+  background-size: 28px 28px;
+  animation: vhs-tracking 1.1s linear infinite;
+}
+
+/* Cassette tape reel spin */
+@keyframes tape-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tape-reel-spin {
+  animation: tape-spin 2.2s linear infinite;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .retro-backdrop::after {
+    display: none;
+  }
+  .vhs-tracking-fill,
+  .tape-reel-spin {
+    animation: none;
+  }
+  .retro-btn {
+    transition: none;
+  }
+  .retro-btn:hover:not(:disabled),
+  .retro-btn:active:not(:disabled) {
+    transform: none;
+  }
+}

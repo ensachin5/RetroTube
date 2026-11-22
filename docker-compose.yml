@@ -1,0 +1,36 @@
+services:
+  retrotube:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: retrotube
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      YTDLP_PATH: /usr/local/bin/yt-dlp
+      FFMPEG_PATH: /usr/bin/ffmpeg
+      DB_PATH: /app/data/retrotube.db
+      TEMP_DIR: /app/tmp
+      MAX_CONCURRENT_JOBS: ${MAX_CONCURRENT_JOBS:-2}
+      MAX_VIDEO_MINUTES: ${MAX_VIDEO_MINUTES:-180}
+      APP_PASSWORD: ${APP_PASSWORD:-}
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-3600}
+      RATE_LIMIT_FETCH_PER_MIN: ${RATE_LIMIT_FETCH_PER_MIN:-20}
+      RATE_LIMIT_DOWNLOAD_PER_MIN: ${RATE_LIMIT_DOWNLOAD_PER_MIN:-10}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      YTDLP_FETCH_TIMEOUT_MS: ${YTDLP_FETCH_TIMEOUT_MS:-30000}
+      YTDLP_DOWNLOAD_TIMEOUT_MS: ${YTDLP_DOWNLOAD_TIMEOUT_MS:-1800000}
+      YTDLP_CONCURRENT_FRAGMENTS: ${YTDLP_CONCURRENT_FRAGMENTS:-4}
+      YTDLP_HTTP_CHUNK_SIZE: ${YTDLP_HTTP_CHUNK_SIZE:-10M}
+      YTDLP_BUFFER_SIZE: ${YTDLP_BUFFER_SIZE:-16K}
+      YTDLP_PROXY: ${YTDLP_PROXY:-}
+      YTDLP_COOKIES_FILE: ${YTDLP_COOKIES_FILE:-}
+      YTDLP_USE_ARIA2: ${YTDLP_USE_ARIA2:-false}
+    volumes:
+      - retrotube_data:/app/data
+      - retrotube_tmp:/app/tmp
+    restart: unless-stopped
+
+volumes:
+  retrotube_data:
+  retrotube_tmp:
