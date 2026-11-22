@@ -11,19 +11,11 @@ import { formatsRepo } from "@/repositories/formats.repo";
 import { jobsRepo } from "@/repositories/jobs.repo";
 import { videosRepo } from "@/repositories/videos.repo";
 import { batchService } from "@/services/batch.service";
-import {
-  type FormatRow,
-  matchFormatForPreset,
-} from "@/services/format.normalizer";
+import { type FormatRow, matchFormatForPreset } from "@/services/format.normalizer";
 import { jobService } from "@/services/job.service";
 import { fetchService } from "@/services/fetch.service";
-import {
-  playlistService,
-} from "@/services/playlist.service";
-import {
-  type RawYtDlpPlaylistInfo,
-  ytdlpService,
-} from "@/services/ytdlp.service";
+import { playlistService } from "@/services/playlist.service";
+import { type RawYtDlpPlaylistInfo, ytdlpService } from "@/services/ytdlp.service";
 import { zipService } from "@/services/zip.service";
 
 describe("Stage 2: Playlist & Batch Support", () => {
@@ -43,9 +35,7 @@ describe("Stage 2: Playlist & Batch Support", () => {
       expect(combined.videoId).toBe("dQw4w9WgXcQ");
       expect(combined.playlistId).toBe("PL1234567890abcdef");
 
-      const videoOnly = parseYouTubeUrl(
-        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-      );
+      const videoOnly = parseYouTubeUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
       expect(videoOnly.type).toBe("video");
       expect(videoOnly.videoId).toBe("dQw4w9WgXcQ");
       expect(videoOnly.playlistId).toBeUndefined();
@@ -58,9 +48,7 @@ describe("Stage 2: Playlist & Batch Support", () => {
       const fixtureContent = await fsp.readFile(fixturePath, "utf8");
       const fixturePlaylist: RawYtDlpPlaylistInfo = JSON.parse(fixtureContent);
 
-      vi.spyOn(ytdlpService, "inspectPlaylistFlat").mockResolvedValue(
-        fixturePlaylist,
-      );
+      vi.spyOn(ytdlpService, "inspectPlaylistFlat").mockResolvedValue(fixturePlaylist);
 
       const result = await playlistService.fetchPlaylistMetadata(
         "https://www.youtube.com/playlist?list=PL_TEST_SAMPLE_FIXTURE",
@@ -120,9 +108,7 @@ describe("Stage 2: Playlist & Batch Support", () => {
       const fixtureContent = await fsp.readFile(fixturePath, "utf8");
       const fixturePlaylist: RawYtDlpPlaylistInfo = JSON.parse(fixtureContent);
 
-      vi.spyOn(ytdlpService, "inspectPlaylistFlat").mockResolvedValue(
-        fixturePlaylist,
-      );
+      vi.spyOn(ytdlpService, "inspectPlaylistFlat").mockResolvedValue(fixturePlaylist);
 
       const result = await playlistService.fetchPlaylistMetadata(
         "https://www.youtube.com/playlist?list=PL_TEST_SAMPLE_FIXTURE",
@@ -240,7 +226,7 @@ describe("Stage 2: Playlist & Batch Support", () => {
     it("numbers items with 3-digit padding and sanitizes invalid characters", () => {
       const name1 = buildNumberedBatchFilename({
         position: 1,
-        title: 'Song #1: AC/DC - Thunderstruck <Official>? *Live*',
+        title: "Song #1: AC/DC - Thunderstruck <Official>? *Live*",
         extension: "mp3",
       });
       expect(name1).toBe("001 - Song #1 AC DC - Thunderstruck Official Live.mp3");
@@ -495,7 +481,9 @@ describe("Stage 2: Playlist & Batch Support", () => {
       expect(processSpy).toHaveBeenCalledWith(batchId);
       processSpy.mockRestore();
 
-      const reloadedItem = batchItemsRepo.findByBatchId(batchId).find((i) => i.id === items[0]!.id);
+      const reloadedItem = batchItemsRepo
+        .findByBatchId(batchId)
+        .find((i) => i.id === items[0]!.id);
       // Status reset from running back to queued so it can continue with yt-dlp --continue
       expect(reloadedItem?.status).toBe("queued");
 
@@ -603,32 +591,36 @@ describe("Stage 2: Playlist & Batch Support", () => {
       vi.spyOn(jobService, "enqueue").mockImplementation(() => {});
 
       // Mock job completion: vid_ok succeeds, vid_err fails
-      vi.spyOn(jobService, "waitForJobCompletion").mockImplementation(
-        async (jobId) => {
-          const reloadedItems = batchItemsRepo.findByBatchId(batchId);
-          const item1 = reloadedItems.find((i) => i.youtubeId === "vid_ok");
-          if (item1?.jobId === jobId) {
-            jobsRepo.transitionToRunning(jobId);
-            jobsRepo.markDone(jobId, { tempFilepath: "/tmp/mock.mp4", bytesTotal: 10000000 });
-            return {
-              jobId,
-              status: "done",
-              bytesTotal: 10000000,
-              progressPct: 100,
-              stage: "done",
-            };
-          }
+      vi.spyOn(jobService, "waitForJobCompletion").mockImplementation(async (jobId) => {
+        const reloadedItems = batchItemsRepo.findByBatchId(batchId);
+        const item1 = reloadedItems.find((i) => i.youtubeId === "vid_ok");
+        if (item1?.jobId === jobId) {
           jobsRepo.transitionToRunning(jobId);
-          jobsRepo.markFailed(jobId, { errorCode: "DOWNLOAD_FAILED", errorMessage: "Failed" });
+          jobsRepo.markDone(jobId, {
+            tempFilepath: "/tmp/mock.mp4",
+            bytesTotal: 10000000,
+          });
           return {
             jobId,
-            status: "failed",
-            errorCode: "DOWNLOAD_FAILED",
-            progressPct: 0,
-            stage: "failed",
+            status: "done",
+            bytesTotal: 10000000,
+            progressPct: 100,
+            stage: "done",
           };
-        },
-      );
+        }
+        jobsRepo.transitionToRunning(jobId);
+        jobsRepo.markFailed(jobId, {
+          errorCode: "DOWNLOAD_FAILED",
+          errorMessage: "Failed",
+        });
+        return {
+          jobId,
+          status: "failed",
+          errorCode: "DOWNLOAD_FAILED",
+          progressPct: 0,
+          stage: "failed",
+        };
+      });
 
       await batchService.processBatch(batchId);
 

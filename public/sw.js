@@ -86,11 +86,7 @@ self.addEventListener("fetch", (event) => {
       (async () => {
         try {
           const networkResponse = await fetch(request);
-          if (
-            networkResponse.ok &&
-            !networkResponse.redirected &&
-            !url.pathname.startsWith("/unlock")
-          ) {
+          if (networkResponse.ok && !networkResponse.redirected) {
             const cache = await caches.open(CACHE_VERSION);
             cache.put(request, networkResponse.clone()).catch(() => undefined);
           }

@@ -180,4 +180,3 @@ export type HistoryRow = typeof history.$inferSelect;
 export type NewHistoryRow = typeof history.$inferInsert;
 export type SettingRow = typeof settings.$inferSelect;
 export type NewSettingRow = typeof settings.$inferInsert;
-

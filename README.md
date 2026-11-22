@@ -15,7 +15,6 @@ RetroTube is a lightweight, self-hostable personal media deck and Progressive We
 - **Local SQLite History:** Stores the last 50 downloads in SQLite (`better-sqlite3` + Drizzle ORM) with delete, clear all, and re-download.
 - **Retro Paper Theme:** Warm cream paper background, ink-black typography, tomato red, mustard, and teal accent tokens with halftone dots and hard offset shadows.
 - **Installable PWA:** Web App Manifest (`app/manifest.ts`), hand-written Service Worker (`public/sw.js`), offline fallback (`/offline`), iOS home-screen hint, Chromium install banner, and Android Web Share Target (`share_target`).
-- **Optional Password Gate:** Set `APP_PASSWORD` to lock down the UI and API with an `HttpOnly`, `SameSite=Strict` HMAC-SHA256 cookie.
 
 ### V2 Additions: (A) Playlist Support
 - **Fast Playlist Listing:** `POST /api/playlist/fetch` uses `yt-dlp --flat-playlist -J` for lightning-fast inspection without per-video format probing.
@@ -130,7 +129,6 @@ In `docker-compose.yml`:
 | `BATCH_CONCURRENCY`           | `1`                   | Concurrent downloads inside a batch queue (`1–3`)                           |
 | `BATCH_ITEM_DELAY_MS`         | `1000`                | Randomized jitter delay in ms between playlist items to avoid rate limits   |
 | `SERVER_SAVE_DIR`             | _(empty)_             | Optional host directory to automatically save completed batch media files   |
-| `APP_PASSWORD`                | _(empty)_             | Optional shared password gate (`HttpOnly; SameSite=Strict`)                 |
 | `CACHE_TTL_SECONDS`           | `3600`                | Metadata cache TTL in SQLite (1 hour)                                       |
 | `RATE_LIMIT_FETCH_PER_MIN`    | `20`                  | Per-IP `/api/fetch` limit per minute                                        |
 | `RATE_LIMIT_DOWNLOAD_PER_MIN` | `10`                  | Per-IP `/api/download` limit per minute                                     |

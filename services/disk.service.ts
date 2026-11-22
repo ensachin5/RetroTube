@@ -52,7 +52,7 @@ export const diskService = {
     const tempDirPath = this.getTempDir();
 
     let diskTotalBytes = 100 * 1024 * 1024 * 1024; // 100 GB default fallback
-    let diskFreeBytes = 50 * 1024 * 1024 * 1024;  // 50 GB default fallback
+    let diskFreeBytes = 50 * 1024 * 1024 * 1024; // 50 GB default fallback
 
     try {
       const stat = await fsp.statfs(tempDirPath);

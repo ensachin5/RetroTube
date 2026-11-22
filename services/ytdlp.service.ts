@@ -154,7 +154,8 @@ export function mapYtDlpStderrToError(stderr: string): AppError {
     return new AppError({
       code: ERROR_CODES.PLAYLIST_EMPTY,
       status: 404,
-      message: "This playlist does not exist, is private, or cannot be viewed as a batch playlist.",
+      message:
+        "This playlist does not exist, is private, or cannot be viewed as a batch playlist.",
     });
   }
 
@@ -175,7 +176,8 @@ export const ytdlpService = {
       "--no-warnings",
       "--no-check-formats",
       "--skip-download",
-      "--no-js-runtimes",
+      "--remote-components",
+      "ejs:github",
       "--no-write-comments",
       "--no-write-thumbnail",
       "--no-write-subs",
@@ -187,6 +189,9 @@ export const ytdlpService = {
     ];
     if (env.YTDLP_COOKIES_FILE) {
       args.push("--cookies", env.YTDLP_COOKIES_FILE);
+    }
+    if (env.YTDLP_COOKIES_FROM_BROWSER) {
+      args.push("--cookies-from-browser", env.YTDLP_COOKIES_FROM_BROWSER);
     }
     if (env.YTDLP_PROXY) {
       args.push("--proxy", env.YTDLP_PROXY);
@@ -227,6 +232,20 @@ export const ytdlpService = {
     }
 
     if (result.code !== 0) {
+      const mapped = mapYtDlpStderrToError(result.stderr || result.stdout);
+      if (mapped.code === ERROR_CODES.RATE_LIMITED && !signal?.aborted) {
+        // Transient rate limit from YouTube: wait 1.5s and retry once automatically
+        await new Promise((res) => setTimeout(res, 1500));
+        result = await runSpawnedCommand({
+          command: env.YTDLP_PATH,
+          args,
+          timeoutMs: env.YTDLP_FETCH_TIMEOUT_MS,
+          signal,
+        });
+      }
+    }
+
+    if (result.code !== 0) {
       throw mapYtDlpStderrToError(result.stderr || result.stdout);
     }
 
@@ -264,7 +283,8 @@ export const ytdlpService = {
       "--no-warnings",
       "--no-check-formats",
       "--skip-download",
-      "--no-js-runtimes",
+      "--remote-components",
+      "ejs:github",
       "--ignore-errors",
       "--no-write-comments",
       "--no-write-thumbnail",
@@ -277,6 +297,9 @@ export const ytdlpService = {
     ];
     if (env.YTDLP_COOKIES_FILE) {
       args.push("--cookies", env.YTDLP_COOKIES_FILE);
+    }
+    if (env.YTDLP_COOKIES_FROM_BROWSER) {
+      args.push("--cookies-from-browser", env.YTDLP_COOKIES_FROM_BROWSER);
     }
     if (env.YTDLP_PROXY) {
       args.push("--proxy", env.YTDLP_PROXY);
@@ -345,7 +368,8 @@ export const ytdlpService = {
       throw new AppError({
         code: ERROR_CODES.PLAYLIST_EMPTY,
         status: 404,
-        message: "Could not retrieve playlist metadata. The playlist may be empty, private, or unavailable.",
+        message:
+          "Could not retrieve playlist metadata. The playlist may be empty, private, or unavailable.",
       });
     }
 
@@ -365,7 +389,8 @@ export const ytdlpService = {
       "--newline",
       "--progress",
       "--continue",
-      "--no-js-runtimes",
+      "--remote-components",
+      "ejs:github",
       "--no-warnings",
       "--concurrent-fragments",
       String(env.YTDLP_CONCURRENT_FRAGMENTS),
@@ -386,6 +411,9 @@ export const ytdlpService = {
 
     if (env.YTDLP_COOKIES_FILE) {
       args.push("--cookies", env.YTDLP_COOKIES_FILE);
+    }
+    if (env.YTDLP_COOKIES_FROM_BROWSER) {
+      args.push("--cookies-from-browser", env.YTDLP_COOKIES_FROM_BROWSER);
     }
     if (env.YTDLP_PROXY) {
       args.push("--proxy", env.YTDLP_PROXY);

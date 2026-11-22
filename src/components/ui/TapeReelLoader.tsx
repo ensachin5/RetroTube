@@ -44,7 +44,10 @@ export function TapeReelLoader({
           stroke="currentColor"
           strokeWidth="1.5"
         />
-        <g className={spinning ? "tape-reel-spin" : ""} style={{ transformOrigin: "17px 14px" }}>
+        <g
+          className={spinning ? "tape-reel-spin" : ""}
+          style={{ transformOrigin: "17px 14px" }}
+        >
           <circle
             cx="17"
             cy="14"

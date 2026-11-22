@@ -26,18 +26,15 @@ const createBatchSchema = z.object({
   targetContainer: z.string().min(1),
 });
 
-export const POST = withApiHandler(
-  { route: "/api/batch" },
-  async (request, ctx) => {
-    const body = await parseJsonBody(request, createBatchSchema);
-    const env = getEnv();
-    getRateLimiter().enforce("download", ctx.clientIp, env.RATE_LIMIT_DOWNLOAD_PER_MIN);
+export const POST = withApiHandler({ route: "/api/batch" }, async (request, ctx) => {
+  const body = await parseJsonBody(request, createBatchSchema);
+  const env = getEnv();
+  getRateLimiter().enforce("download", ctx.clientIp, env.RATE_LIMIT_DOWNLOAD_PER_MIN);
 
-    const result = await batchService.createBatch({
-      ...body,
-      requestId: ctx.requestId,
-    });
+  const result = await batchService.createBatch({
+    ...body,
+    requestId: ctx.requestId,
+  });
 
-    return jsonOk(result, ctx.requestId, 202);
-  },
-);
+  return jsonOk(result, ctx.requestId, 202);
+});

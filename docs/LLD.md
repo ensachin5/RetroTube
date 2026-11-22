@@ -17,14 +17,9 @@ kisni/
 │   │   └── page.tsx                    # Download history view (Single videos & Batch runs)
 │   ├── offline/
 │   │   └── page.tsx                    # PWA offline fallback ("Tape not found")
-│   ├── unlock/
-│   │   └── page.tsx                    # Optional APP_PASSWORD login screen
 │   ├── manifest.ts                     # Dynamic Web App Manifest (shortcuts, share_target)
 │   └── api/
 │       ├── health/route.ts             # GET  /api/health
-│       ├── auth/
-│       │   ├── login/route.ts          # POST /api/auth/login
-│       │   └── logout/route.ts         # POST /api/auth/logout
 │       ├── fetch/route.ts              # POST /api/fetch (Single video fetch)
 │       ├── playlist/
 │       │   └── fetch/route.ts          # POST /api/playlist/fetch (Fast flat listing)
@@ -50,7 +45,7 @@ kisni/
 │           └── storage/
 │               ├── route.ts            # GET  /api/settings/storage (Free space, temp stats)
 │               └── clean/route.ts      # POST /api/settings/storage/clean (Manual sweep)
-├── proxy.ts                            # Next.js 16 Proxy: requestId injection & optional APP_PASSWORD gate
+├── proxy.ts                            # Next.js 16 Proxy: requestId injection
 ├── instrumentation.ts                  # Server boot: run migrations, recover interrupted batches, start sweeper
 ├── db/
 │   ├── schema.ts                       # Drizzle SQLite tables (videos, formats, batches, batch_items, jobs, history)
@@ -258,7 +253,7 @@ sequenceDiagram
         API->>Repo: createBatch(status: "queued") + createBatchItems(status: "queued")
         API->>BS: startBatch(batchId)
         API-->>User: 202 Accepted { batchId, status: "queued", eventsUrl: "/api/batch/[id]/events" }
-        
+
         loop For each selected item (concurrency: BATCH_CONCURRENCY)
             BS->>BS: Sleep random jitter (BATCH_ITEM_DELAY_MS, e.g. 1000..3000ms)
             BS->>Repo: updateItemStatus(itemId, "running")
@@ -327,7 +322,7 @@ sequenceDiagram
     Repo-->>API: Batch record + 25 completed items with temp filepaths
     API->>ZS: createStreamingZip(batch, completedItems)
     API-->>Browser: 200 OK (Transfer-Encoding: chunked, Content-Type: application/zip, Content-Disposition: attachment; filename="Playlist_Title.zip")
-    
+
     loop For each completed item in position order
         ZS->>FS: fs.createReadStream(item.tempFilepath)
         ZS->>ZS: Write ZIP local file header (STORE mode, 0 compression, ZIP64 format)
@@ -450,7 +445,7 @@ All error responses share the standardized error envelope:
     "targetContainer": "mp4"
   }
   ```
-  *Presets supported:*
+  _Presets supported:_
   - Video: `"best_video"`, `"1080p"`, `"720p"`, `"480p"`
   - Audio: `"audio_best"`, `"mp3_320"`, `"mp3_192"`, `"mp3_128"`, `"m4a"`, `"opus"`, `"flac"`, `"wav"`
 - **Response (`202 Accepted`):**
@@ -639,33 +634,32 @@ stateDiagram-v2
 
 ## 6. Error Code Catalogue
 
-| Error Code            | HTTP Status | Trigger / Detection                                                     | User-Friendly Message                                                                    |
-| :-------------------- | :---------- | :---------------------------------------------------------------------- | :--------------------------------------------------------------------------------------- |
-| `VALIDATION_ERROR`    | `400`       | Zod schema validation failure                                           | Request input is invalid.                                                                |
-| `INVALID_URL`         | `400`       | Non-YouTube host or unparseable URL                                     | Please enter a valid YouTube video or playlist link.                                     |
-| `PLAYLIST_EMPTY`      | `422`       | Flat playlist inspection returned 0 items                               | This playlist does not contain any videos.                                               |
-| `PLAYLIST_TOO_LARGE`  | `422`       | Playlist item count exceeds `MAX_PLAYLIST_ITEMS` (default 200)          | Playlist exceeds the maximum allowed item count. Use the 'first N' option to continue.   |
-| `ITEM_UNAVAILABLE`    | `404/422`   | Video in playlist is private, deleted, or blocked                       | This video is unavailable and will be skipped.                                           |
-| `INSUFFICIENT_DISK`   | `507`       | Staging disk free space below required estimate + `MIN_FREE_DISK_GB`   | Server has insufficient disk space to stage this download. Please free storage or clean. |
-| `FILE_TOO_LARGE`      | `422`       | Video size exceeds configured `MAX_FILE_SIZE_GB` (when set > 0)         | File exceeds the maximum allowed file size.                                              |
-| `TIMEOUT`             | `504`       | Process stall (no progress for N minutes) or max execution duration    | Media processing timed out. Please try again.                                            |
-| `UNAUTHORIZED`        | `401`       | Missing or invalid session cookie when `APP_PASSWORD` is set            | Password required to access RetroTube.                                                   |
-| `JOB_NOT_FOUND`       | `404`       | Unknown `jobId`, `batchId`, or `history` entry                          | The requested job, batch, or history record was not found.                               |
-| `INVALID_JOB_STATE`   | `409`       | Operation invalid for current state                                     | Job or batch is not in a valid state for this action.                                    |
-| `FILE_EXPIRED`        | `410`       | Staged file already cleaned up after TTL                                | Downloaded file has expired from temporary storage. Please re-download.                  |
-| `VIDEO_TOO_LONG`      | `422`       | Video duration exceeds `MAX_VIDEO_MINUTES` (when set > 0)               | This video exceeds the maximum configured duration limit.                                |
-| `LIVE_STREAM`         | `422`       | Live broadcast in progress                                              | Live streams cannot be downloaded while broadcasting.                                    |
-| `PRIVATE_VIDEO`       | `403`       | Private YouTube video                                                   | This video is private and cannot be accessed.                                            |
-| `AGE_RESTRICTED`      | `403`       | Age-restricted video requiring authentication                           | This video is age-restricted and cannot be fetched without sign-in.                      |
-| `GEO_BLOCKED`         | `451`       | Country/regional restriction                                            | This video is unavailable in the server's region.                                        |
-| `VIDEO_UNAVAILABLE`   | `404`       | Removed or terminated video                                             | This video is unavailable or has been removed.                                           |
-| `RATE_LIMITED`        | `429`       | In-memory per-IP limit or YouTube HTTP 429                              | Too many requests right now. Please wait a moment and try again.                         |
-| `QUEUE_FULL`          | `429`       | Active + queued jobs exceed queue cap                                   | Download queue is currently busy. Please wait for an active job to finish.               |
-| `YTDLP_FAILED`        | `502`       | Non-zero `yt-dlp` exit or parse error                                   | Failed to fetch or download media via yt-dlp.                                            |
-| `FFMPEG_FAILED`       | `500`       | Non-zero `ffmpeg` exit                                                  | Failed to merge or convert media streams via ffmpeg.                                     |
-| `SERVER_RESTART`      | `500`       | Job was interrupted by server reboot and could not be resumed          | Job was interrupted by a server restart.                                                 |
-| `JOB_CANCELLED`       | `200/499`   | User cancelled active execution                                         | Download was cancelled.                                                                  |
-| `INTERNAL_ERROR`      | `500`       | Unhandled server exception                                              | An unexpected error occurred.                                                            |
+| Error Code           | HTTP Status | Trigger / Detection                                                  | User-Friendly Message                                                                    |
+| :------------------- | :---------- | :------------------------------------------------------------------- | :--------------------------------------------------------------------------------------- |
+| `VALIDATION_ERROR`   | `400`       | Zod schema validation failure                                        | Request input is invalid.                                                                |
+| `INVALID_URL`        | `400`       | Non-YouTube host or unparseable URL                                  | Please enter a valid YouTube video or playlist link.                                     |
+| `PLAYLIST_EMPTY`     | `422`       | Flat playlist inspection returned 0 items                            | This playlist does not contain any videos.                                               |
+| `PLAYLIST_TOO_LARGE` | `422`       | Playlist item count exceeds `MAX_PLAYLIST_ITEMS` (default 200)       | Playlist exceeds the maximum allowed item count. Use the 'first N' option to continue.   |
+| `ITEM_UNAVAILABLE`   | `404/422`   | Video in playlist is private, deleted, or blocked                    | This video is unavailable and will be skipped.                                           |
+| `INSUFFICIENT_DISK`  | `507`       | Staging disk free space below required estimate + `MIN_FREE_DISK_GB` | Server has insufficient disk space to stage this download. Please free storage or clean. |
+| `FILE_TOO_LARGE`     | `422`       | Video size exceeds configured `MAX_FILE_SIZE_GB` (when set > 0)      | File exceeds the maximum allowed file size.                                              |
+| `TIMEOUT`            | `504`       | Process stall (no progress for N minutes) or max execution duration  | Media processing timed out. Please try again.                                            |
+| `JOB_NOT_FOUND`      | `404`       | Unknown `jobId`, `batchId`, or `history` entry                       | The requested job, batch, or history record was not found.                               |
+| `INVALID_JOB_STATE`  | `409`       | Operation invalid for current state                                  | Job or batch is not in a valid state for this action.                                    |
+| `FILE_EXPIRED`       | `410`       | Staged file already cleaned up after TTL                             | Downloaded file has expired from temporary storage. Please re-download.                  |
+| `VIDEO_TOO_LONG`     | `422`       | Video duration exceeds `MAX_VIDEO_MINUTES` (when set > 0)            | This video exceeds the maximum configured duration limit.                                |
+| `LIVE_STREAM`        | `422`       | Live broadcast in progress                                           | Live streams cannot be downloaded while broadcasting.                                    |
+| `PRIVATE_VIDEO`      | `403`       | Private YouTube video                                                | This video is private and cannot be accessed.                                            |
+| `AGE_RESTRICTED`     | `403`       | Age-restricted video requiring authentication                        | This video is age-restricted and cannot be fetched without sign-in.                      |
+| `GEO_BLOCKED`        | `451`       | Country/regional restriction                                         | This video is unavailable in the server's region.                                        |
+| `VIDEO_UNAVAILABLE`  | `404`       | Removed or terminated video                                          | This video is unavailable or has been removed.                                           |
+| `RATE_LIMITED`       | `429`       | In-memory per-IP limit or YouTube HTTP 429                           | Too many requests right now. Please wait a moment and try again.                         |
+| `QUEUE_FULL`         | `429`       | Active + queued jobs exceed queue cap                                | Download queue is currently busy. Please wait for an active job to finish.               |
+| `YTDLP_FAILED`       | `502`       | Non-zero `yt-dlp` exit or parse error                                | Failed to fetch or download media via yt-dlp.                                            |
+| `FFMPEG_FAILED`      | `500`       | Non-zero `ffmpeg` exit                                               | Failed to merge or convert media streams via ffmpeg.                                     |
+| `SERVER_RESTART`     | `500`       | Job was interrupted by server reboot and could not be resumed        | Job was interrupted by a server restart.                                                 |
+| `JOB_CANCELLED`      | `200/499`   | User cancelled active execution                                      | Download was cancelled.                                                                  |
+| `INTERNAL_ERROR`     | `500`       | Unhandled server exception                                           | An unexpected error occurred.                                                            |
 
 ---
 

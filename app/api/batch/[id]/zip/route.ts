@@ -1,19 +1,16 @@
 import fs from "node:fs";
 import { AppError, ERROR_CODES } from "@/lib/errors";
 import { buildContentDisposition, sanitizeFilenameSegment } from "@/lib/filename";
-import { getOrCreateRequestId, requireApiAuth } from "@/lib/http";
+import { getOrCreateRequestId } from "@/lib/http";
 import { batchesRepo } from "@/repositories/batches.repo";
 import { jobsRepo } from "@/repositories/jobs.repo";
 import { type ZipItemDescriptor, zipService } from "@/services/zip.service";
-
-
 
 export async function GET(
   request: Request,
   routeContext: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const requestId = getOrCreateRequestId(request);
-  await requireApiAuth(request);
 
   const { id } = await routeContext.params;
   const data = batchesRepo.findWithItemsById(id);

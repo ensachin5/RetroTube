@@ -4,8 +4,6 @@ import path from "node:path";
 import { NextRequest } from "next/server";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { GET as healthGET } from "@/app/api/health/route";
-import { POST as loginPOST } from "@/app/api/auth/login/route";
-import { POST as logoutPOST } from "@/app/api/auth/logout/route";
 import { POST as fetchPOST } from "@/app/api/fetch/route";
 import { POST as playlistFetchPOST } from "@/app/api/playlist/fetch/route";
 import { POST as downloadPOST } from "@/app/api/download/route";
@@ -13,14 +11,11 @@ import { GET as streamGET } from "@/app/api/download/[jobId]/stream/route";
 import { GET as eventsGET } from "@/app/api/jobs/[jobId]/events/route";
 import { POST as cancelPOST } from "@/app/api/jobs/[jobId]/cancel/route";
 import { POST as batchPOST } from "@/app/api/batch/route";
-import {
-  GET as batchGET,
-  DELETE as batchDELETE,
-} from "@/app/api/batch/[id]/route";
+import { GET as batchGET, DELETE as batchDELETE } from "@/app/api/batch/[id]/route";
 import { POST as batchCancelPOST } from "@/app/api/batch/[id]/cancel/route";
 import { POST as batchRetryPOST } from "@/app/api/batch/[id]/retry-failed/route";
 import { GET as batchZipGET } from "@/app/api/batch/[id]/zip/route";
-import { GET as historyGET } from "@/app/api/history/route";
+import { GET as historyGET, DELETE as historyClearAllDELETE } from "@/app/api/history/route";
 import { DELETE as historyDELETE } from "@/app/api/history/[id]/route";
 import { closeDb, getDb } from "@/db/client";
 import { ERROR_CODES } from "@/lib/errors";
@@ -178,7 +173,6 @@ process.exit(0);
     process.env.RATE_LIMIT_FETCH_PER_MIN = "20";
     process.env.RATE_LIMIT_DOWNLOAD_PER_MIN = "10";
     process.env.YTDLP_FETCH_TIMEOUT_MS = "5000";
-    process.env.APP_PASSWORD = "";
 
     getRateLimiter().reset();
     closeDb();
@@ -196,7 +190,6 @@ process.exit(0);
     delete process.env.MOCK_FIXTURE_PATH;
     delete process.env.MOCK_YTDLP_MODE;
     delete process.env.MOCK_DOWNLOAD_DELAY_MS;
-    delete process.env.APP_PASSWORD;
   });
 
   it("reports healthy checks on GET /api/health", async () => {
@@ -325,6 +318,13 @@ process.exit(0);
       await historyGET(new NextRequest("http://localhost:3000/api/history"))
     ).json()) as { items: unknown[] };
     expect(histAfter.items).toHaveLength(0);
+
+    // Test clear all on empty or populated history
+    const clearRes = await historyClearAllDELETE(
+      new NextRequest("http://localhost:3000/api/history", { method: "DELETE" }),
+    );
+    expect(clearRes.status).toBe(200);
+    expect(((await clearRes.json()) as { cleared: number }).cleared).toBe(0);
   });
 
   it("supports MP3 audio conversion and active job cancellation", async () => {
@@ -475,57 +475,6 @@ process.exit(0);
     );
   });
 
-  it("enforces APP_PASSWORD cookie gate with httpOnly and sameSite strict when enabled", async () => {
-    process.env.APP_PASSWORD = "secret-tape-password";
-
-    const unauthRes = await fetchPOST(
-      makeJsonRequest("http://localhost:3000/api/fetch", "POST", {
-        url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-      }),
-    );
-    expect(unauthRes.status).toBe(401);
-    expect(((await unauthRes.json()) as { error: { code: string } }).error.code).toBe(
-      ERROR_CODES.UNAUTHORIZED,
-    );
-
-    // Wrong password
-    const badLogin = await loginPOST(
-      makeJsonRequest("http://localhost:3000/api/auth/login", "POST", {
-        password: "wrong",
-      }),
-    );
-    expect(badLogin.status).toBe(401);
-
-    // Correct password issues httpOnly + SameSite=Strict cookie
-    const goodLogin = await loginPOST(
-      makeJsonRequest("http://localhost:3000/api/auth/login", "POST", {
-        password: "secret-tape-password",
-      }),
-    );
-    expect(goodLogin.status).toBe(200);
-    const setCookie = goodLogin.headers.get("set-cookie") ?? "";
-    expect(setCookie).toContain("retrotube_session=");
-    expect(setCookie.toLowerCase()).toContain("httponly");
-    expect(setCookie.toLowerCase()).toContain("samesite=strict");
-
-    const cookiePair = setCookie.split(";")[0]!;
-    const authedFetch = await fetchPOST(
-      makeJsonRequest(
-        "http://localhost:3000/api/fetch",
-        "POST",
-        { url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
-        { cookie: cookiePair },
-      ),
-    );
-    expect(authedFetch.status).toBe(200);
-
-    const logoutRes = await logoutPOST(
-      makeJsonRequest("http://localhost:3000/api/auth/logout", "POST"),
-    );
-    expect(logoutRes.status).toBe(200);
-    expect(logoutRes.headers.get("set-cookie")).toContain("Max-Age=0");
-  });
-
   it("deletes temp file when full stream aborts mid-transfer and queues beyond MAX_CONCURRENT_JOBS", async () => {
     const fetchRes = await fetchPOST(
       makeJsonRequest("http://localhost:3000/api/fetch", "POST", {
@@ -612,7 +561,13 @@ process.exit(0);
         title: string;
         channel: string;
         itemCount: number;
-        items: Array<{ position: number; youtubeId: string; title: string; durationSec: number; isAvailable: boolean }>;
+        items: Array<{
+          position: number;
+          youtubeId: string;
+          title: string;
+          durationSec: number;
+          isAvailable: boolean;
+        }>;
       };
     };
     expect(playlistData.isCombined).toBe(false);
@@ -643,17 +598,20 @@ process.exit(0);
     );
     expect(statusRes.status).toBe(200);
     const statusData = (await statusRes.json()) as {
-      batch: { id: string; selectedCount: number; items: Array<{ id: number; status: string }> };
+      batch: {
+        id: string;
+        selectedCount: number;
+        items: Array<{ id: number; status: string }>;
+      };
     };
     expect(statusData.batch.id).toBe(batchId);
     expect(statusData.batch.selectedCount).toBe(1);
 
     // 4. Test zip download when no completed items exist yet (throws INVALID_JOB_STATE 409)
     await expect(
-      batchZipGET(
-        new NextRequest(`http://localhost:3000/api/batch/${batchId}/zip`),
-        { params: Promise.resolve({ id: batchId }) },
-      ),
+      batchZipGET(new NextRequest(`http://localhost:3000/api/batch/${batchId}/zip`), {
+        params: Promise.resolve({ id: batchId }),
+      }),
     ).rejects.toThrowError(
       expect.objectContaining({ code: ERROR_CODES.INVALID_JOB_STATE }),
     );

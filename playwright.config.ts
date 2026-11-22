@@ -23,7 +23,6 @@ export default defineConfig({
     env: {
       DB_PATH: "./tmp/pw-test.db",
       TEMP_DIR: "./tmp/pw-temp",
-      APP_PASSWORD: "",
     },
   },
 });

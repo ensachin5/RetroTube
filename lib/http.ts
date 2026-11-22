@@ -1,12 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import type { z } from "zod";
-import {
-  isAuthEnabled,
-  parseCookieValue,
-  SESSION_COOKIE_NAME,
-  verifySessionToken,
-} from "./auth";
 import { AppError, ERROR_CODES, toErrorResponse } from "./errors";
 import { logger } from "./logger";
 
@@ -52,24 +46,8 @@ export async function parseJsonBody<T>(
   return schema.parse(raw);
 }
 
-export async function requireApiAuth(request: Request): Promise<void> {
-  if (!isAuthEnabled()) return;
-
-  const cookieHeader = request.headers.get("cookie");
-  const token = parseCookieValue(cookieHeader, SESSION_COOKIE_NAME);
-  const valid = await verifySessionToken(token);
-  if (!valid) {
-    throw new AppError({
-      code: ERROR_CODES.UNAUTHORIZED,
-      status: 401,
-      message: "Authentication required. Please unlock with APP_PASSWORD.",
-    });
-  }
-}
-
 export interface ApiHandlerOptions {
   route: string;
-  publicRoute?: boolean;
 }
 
 export function withApiHandler<TParams = Record<string, string>>(
@@ -94,10 +72,6 @@ export function withApiHandler<TParams = Record<string, string>>(
     };
 
     try {
-      if (!options.publicRoute) {
-        await requireApiAuth(request);
-      }
-
       const resolvedContext = routeContext ?? {
         params: Promise.resolve({} as TParams),
       };

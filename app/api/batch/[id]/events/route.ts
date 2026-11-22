@@ -1,17 +1,14 @@
 import type { NextRequest } from "next/server";
 import { AppError, ERROR_CODES } from "@/lib/errors";
-import { getOrCreateRequestId, requireApiAuth } from "@/lib/http";
+import { getOrCreateRequestId } from "@/lib/http";
 import { batchesRepo } from "@/repositories/batches.repo";
 import { type BatchEvent, batchService } from "@/services/batch.service";
-
-
 
 export async function GET(
   request: NextRequest,
   routeContext: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const requestId = getOrCreateRequestId(request);
-  await requireApiAuth(request);
 
   const { id } = await routeContext.params;
   const data = batchesRepo.findWithItemsById(id);

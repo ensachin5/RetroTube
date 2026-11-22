@@ -41,10 +41,7 @@ export interface BatchProgressPanelProps {
   onDismiss: () => void;
 }
 
-export function BatchProgressPanel({
-  batchId,
-  onDismiss,
-}: BatchProgressPanelProps) {
+export function BatchProgressPanel({ batchId, onDismiss }: BatchProgressPanelProps) {
   const [batch, setBatch] = useState<BatchDataState | null>(null);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [activeItemProgress, setActiveItemProgress] = useState<{
@@ -134,9 +131,7 @@ export function BatchProgressPanel({
                 }
               : i,
           );
-          const completedCount = updatedItems.filter(
-            (i) => i.status === "done",
-          ).length;
+          const completedCount = updatedItems.filter((i) => i.status === "done").length;
           return {
             ...prev,
             completedCount,
@@ -163,9 +158,7 @@ export function BatchProgressPanel({
                 }
               : i,
           );
-          const failedCount = updatedItems.filter(
-            (i) => i.status === "failed",
-          ).length;
+          const failedCount = updatedItems.filter((i) => i.status === "failed").length;
           return {
             ...prev,
             failedCount,
@@ -325,7 +318,9 @@ export function BatchProgressPanel({
                 </p>
                 <p className="text-xs text-[var(--text-muted)]">
                   {activeItemProgress.speed ?? "Processing"}
-                  {activeItemProgress.etaSec ? ` • ETA ${activeItemProgress.etaSec}s` : ""}
+                  {activeItemProgress.etaSec
+                    ? ` • ETA ${activeItemProgress.etaSec}s`
+                    : ""}
                 </p>
               </div>
             </div>
@@ -345,8 +340,7 @@ export function BatchProgressPanel({
         <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
           {batch.items.map((item) => {
             const isRunning =
-              item.status === "running" ||
-              activeItemProgress?.itemId === item.id;
+              item.status === "running" || activeItemProgress?.itemId === item.id;
             const isDone = item.status === "done";
             const isFailed = item.status === "failed";
 
@@ -387,12 +381,8 @@ export function BatchProgressPanel({
                   )}
                   {isDone && <Badge tone="teal">Ready</Badge>}
                   {isFailed && <Badge tone="tomato">Failed</Badge>}
-                  {item.status === "queued" && (
-                    <Badge tone="neutral">Queued</Badge>
-                  )}
-                  {item.status === "cancelled" && (
-                    <Badge tone="outline">Cancelled</Badge>
-                  )}
+                  {item.status === "queued" && <Badge tone="neutral">Queued</Badge>}
+                  {item.status === "cancelled" && <Badge tone="outline">Cancelled</Badge>}
 
                   {isDone && item.downloadUrl && (
                     <a

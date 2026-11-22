@@ -23,7 +23,7 @@ All JSON error responses follow a uniform envelope and include an `X-Request-Id`
 
 ## 1. `GET /api/health`
 
-Checks SQLite connectivity, `TEMP_DIR` writability, disk free space, and availability/versions of `yt-dlp` and `ffmpeg`. Always public even when `APP_PASSWORD` is set.
+Checks SQLite connectivity, `TEMP_DIR` writability, disk free space, and availability/versions of `yt-dlp` and `ffmpeg`. Always public.
 
 ```bash
 curl -s http://localhost:3000/api/health | jq .
@@ -34,28 +34,7 @@ curl -s http://localhost:3000/api/health | jq .
 
 ---
 
-## 2. Authentication (`APP_PASSWORD` Gate)
-
-Disabled by default when `APP_PASSWORD` is empty. When enabled, authenticate first and store the `HttpOnly; SameSite=Strict` session cookie in `/tmp/cookies.txt`:
-
-### `POST /api/auth/login`
-
-```bash
-curl -i -c /tmp/cookies.txt -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"password":"your-app-password"}'
-```
-
-### `POST /api/auth/logout`
-
-```bash
-curl -i -b /tmp/cookies.txt -c /tmp/cookies.txt \
-  -X POST http://localhost:3000/api/auth/logout
-```
-
----
-
-## 3. Single Video Metadata: `POST /api/fetch`
+## 2. Single Video Metadata: `POST /api/fetch`
 
 Validates single-video YouTube URLs, checks SQLite 1h cache, or invokes `yt-dlp -J --no-playlist`.
 

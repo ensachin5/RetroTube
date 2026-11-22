@@ -21,11 +21,11 @@ export interface PlaylistPickerProps {
 }
 
 const PRESET_OPTIONS = [
-  { id: "best_video", label: "Best Video", kind: "video", container: "mp4" },
+  { id: "best_video", label: "⚡ Best Video (Highest Available)", kind: "video", container: "mp4" },
   { id: "1080p", label: "1080p HD", kind: "video", container: "mp4" },
   { id: "720p", label: "720p", kind: "video", container: "mp4" },
   { id: "480p", label: "480p", kind: "video", container: "mp4" },
-  { id: "audio_best", label: "Best Audio", kind: "audio", container: "m4a" },
+  { id: "audio_best", label: "⚡ Best Audio (Highest Bitrate)", kind: "audio", container: "m4a" },
   { id: "mp3_320", label: "MP3 320k", kind: "audio", container: "mp3" },
   { id: "mp3_192", label: "MP3 192k", kind: "audio", container: "mp3" },
   { id: "mp3_128", label: "MP3 128k", kind: "audio", container: "mp3" },
@@ -57,7 +57,7 @@ export function PlaylistPicker({
     return new Set(availableItems.map((item) => item.youtubeId));
   });
 
-  const [selectedPresetId, setSelectedPresetId] = useState<string>("1080p");
+  const [selectedPresetId, setSelectedPresetId] = useState<string>("best_video");
   const [rangeStart, setRangeStart] = useState<string>("1");
   const [rangeEnd, setRangeEnd] = useState<string>(
     String(Math.min(20, playlist.items.length)),
@@ -254,9 +254,7 @@ export function PlaylistPicker({
                     {item.title}
                   </p>
                   {!item.isAvailable && (
-                    <Badge tone="tomato">
-                      {item.unavailableReason ?? "Unavailable"}
-                    </Badge>
+                    <Badge tone="tomato">{item.unavailableReason ?? "Unavailable"}</Badge>
                   )}
                 </div>
                 {item.durationSec > 0 && (
@@ -278,8 +276,7 @@ export function PlaylistPicker({
               {selectedIds.size} of {availableItems.length} tracks selected
             </span>
             <Badge tone="neutral">
-              Preset:{" "}
-              {PRESET_OPTIONS.find((p) => p.id === selectedPresetId)?.label}
+              Preset: {PRESET_OPTIONS.find((p) => p.id === selectedPresetId)?.label}
             </Badge>
           </div>
 

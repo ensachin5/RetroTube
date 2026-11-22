@@ -37,21 +37,21 @@ PRAGMA journal_size_limit = 6144000;
 
 Represents a playlist download batch containing multiple selected items.
 
-| Column                 | SQLite Type | Constraints                                                      | Description                                                                                 |
-| :--------------------- | :---------- | :--------------------------------------------------------------- | :------------------------------------------------------------------------------------------ |
-| `id`                   | `TEXT`      | `PRIMARY KEY NOT NULL`                                           | UUID v4 batch identifier                                                                    |
-| `source_url`           | `TEXT`      | `NOT NULL`                                                       | Full original YouTube playlist URL                                                          |
-| `youtube_playlist_id`  | `TEXT`      | `NOT NULL`                                                       | Canonical playlist ID (e.g., `PL...`, `RD...`)                                              |
-| `title`                | `TEXT`      | `NOT NULL`                                                       | Playlist title snapshot                                                                     |
-| `channel`              | `TEXT`      | `NOT NULL`                                                       | Playlist uploader / curator name                                                            |
-| `item_count`           | `INTEGER`   | `NOT NULL`                                                       | Total number of items discovered in the playlist                                            |
-| `selected_count`       | `INTEGER`   | `NOT NULL`                                                       | Total number of items chosen by user to download                                            |
-| `quality_preset`       | `TEXT`      | `NOT NULL`                                                       | Preset: `'best_video' \| '1080p' \| '720p' \| '480p' \| 'audio_best' \| 'mp3_320' \| ...`  |
-| `kind`                 | `TEXT`      | `NOT NULL`                                                       | `'video' \| 'audio'`                                                                        |
-| `target_container`     | `TEXT`      | `NOT NULL`                                                       | Output format: `'mp4' \| 'webm' \| 'mkv' \| 'mp3' \| 'm4a' \| 'opus' \| 'flac' \| 'wav'`    |
-| `status`               | `TEXT`      | `NOT NULL DEFAULT 'queued'`                                      | `'queued' \| 'running' \| 'done' \| 'failed' \| 'cancelled' \| 'paused'`                    |
-| `created_at`           | `INTEGER`   | `NOT NULL`                                                       | Epoch milliseconds when created                                                             |
-| `finished_at`          | `INTEGER`   | Nullable                                                         | Epoch milliseconds when finished or cancelled                                               |
+| Column                | SQLite Type | Constraints                 | Description                                                                               |
+| :-------------------- | :---------- | :-------------------------- | :---------------------------------------------------------------------------------------- |
+| `id`                  | `TEXT`      | `PRIMARY KEY NOT NULL`      | UUID v4 batch identifier                                                                  |
+| `source_url`          | `TEXT`      | `NOT NULL`                  | Full original YouTube playlist URL                                                        |
+| `youtube_playlist_id` | `TEXT`      | `NOT NULL`                  | Canonical playlist ID (e.g., `PL...`, `RD...`)                                            |
+| `title`               | `TEXT`      | `NOT NULL`                  | Playlist title snapshot                                                                   |
+| `channel`             | `TEXT`      | `NOT NULL`                  | Playlist uploader / curator name                                                          |
+| `item_count`          | `INTEGER`   | `NOT NULL`                  | Total number of items discovered in the playlist                                          |
+| `selected_count`      | `INTEGER`   | `NOT NULL`                  | Total number of items chosen by user to download                                          |
+| `quality_preset`      | `TEXT`      | `NOT NULL`                  | Preset: `'best_video' \| '1080p' \| '720p' \| '480p' \| 'audio_best' \| 'mp3_320' \| ...` |
+| `kind`                | `TEXT`      | `NOT NULL`                  | `'video' \| 'audio'`                                                                      |
+| `target_container`    | `TEXT`      | `NOT NULL`                  | Output format: `'mp4' \| 'webm' \| 'mkv' \| 'mp3' \| 'm4a' \| 'opus' \| 'flac' \| 'wav'`  |
+| `status`              | `TEXT`      | `NOT NULL DEFAULT 'queued'` | `'queued' \| 'running' \| 'done' \| 'failed' \| 'cancelled' \| 'paused'`                  |
+| `created_at`          | `INTEGER`   | `NOT NULL`                  | Epoch milliseconds when created                                                           |
+| `finished_at`         | `INTEGER`   | Nullable                    | Epoch milliseconds when finished or cancelled                                             |
 
 - **Indexes:**
   - `idx_batches_status` (on `status`)
@@ -64,19 +64,19 @@ Represents a playlist download batch containing multiple selected items.
 
 Individual video items belonging to a batch execution.
 
-| Column         | SQLite Type | Constraints                                                                | Description                                                                  |
-| :------------- | :---------- | :------------------------------------------------------------------------- | :--------------------------------------------------------------------------- |
-| `id`           | `INTEGER`   | `PRIMARY KEY AUTOINCREMENT NOT NULL`                                       | Surrogate item identifier                                                    |
-| `batch_id`     | `TEXT`      | `NOT NULL, FK -> batches(id) ON DELETE CASCADE`                            | Parent batch                                                                 |
-| `video_id`     | `INTEGER`   | Nullable, `FK -> videos(id) ON DELETE SET NULL`                            | Linked video cache row (if metadata was fetched)                             |
-| `position`     | `INTEGER`   | `NOT NULL`                                                                 | 1-based order index in the playlist                                          |
-| `youtube_id`   | `TEXT`      | `NOT NULL`                                                                 | 11-character YouTube video ID                                                |
-| `title`        | `TEXT`      | `NOT NULL`                                                                 | Snapshot of item title                                                       |
-| `duration_sec` | `INTEGER`   | `NOT NULL DEFAULT 0`                                                       | Duration in seconds                                                          |
-| `status`       | `TEXT`      | `NOT NULL DEFAULT 'queued'`                                                | `'queued' \| 'running' \| 'done' \| 'failed' \| 'skipped' \| 'cancelled'`    |
-| `job_id`       | `TEXT`      | Nullable, `FK -> download_jobs(id) ON DELETE SET NULL`                     | Linked download worker job                                                   |
-| `error_code`   | `TEXT`      | Nullable                                                                   | Error code if `failed` or `skipped` (e.g. `ITEM_UNAVAILABLE`)                |
-| `retry_count`  | `INTEGER`   | `NOT NULL DEFAULT 0`                                                       | Count of automatic/manual retry attempts (`0..2`)                            |
+| Column         | SQLite Type | Constraints                                            | Description                                                               |
+| :------------- | :---------- | :----------------------------------------------------- | :------------------------------------------------------------------------ |
+| `id`           | `INTEGER`   | `PRIMARY KEY AUTOINCREMENT NOT NULL`                   | Surrogate item identifier                                                 |
+| `batch_id`     | `TEXT`      | `NOT NULL, FK -> batches(id) ON DELETE CASCADE`        | Parent batch                                                              |
+| `video_id`     | `INTEGER`   | Nullable, `FK -> videos(id) ON DELETE SET NULL`        | Linked video cache row (if metadata was fetched)                          |
+| `position`     | `INTEGER`   | `NOT NULL`                                             | 1-based order index in the playlist                                       |
+| `youtube_id`   | `TEXT`      | `NOT NULL`                                             | 11-character YouTube video ID                                             |
+| `title`        | `TEXT`      | `NOT NULL`                                             | Snapshot of item title                                                    |
+| `duration_sec` | `INTEGER`   | `NOT NULL DEFAULT 0`                                   | Duration in seconds                                                       |
+| `status`       | `TEXT`      | `NOT NULL DEFAULT 'queued'`                            | `'queued' \| 'running' \| 'done' \| 'failed' \| 'skipped' \| 'cancelled'` |
+| `job_id`       | `TEXT`      | Nullable, `FK -> download_jobs(id) ON DELETE SET NULL` | Linked download worker job                                                |
+| `error_code`   | `TEXT`      | Nullable                                               | Error code if `failed` or `skipped` (e.g. `ITEM_UNAVAILABLE`)             |
+| `retry_count`  | `INTEGER`   | `NOT NULL DEFAULT 0`                                   | Count of automatic/manual retry attempts (`0..2`)                         |
 
 - **Indexes:**
   - `idx_batch_items_batch_id` (on `batch_id`)
@@ -90,26 +90,26 @@ Individual video items belonging to a batch execution.
 
 Tracks queued, active, completed, failed, cancelled, and paused download/merge/conversion jobs.
 
-| Column                | SQLite Type | Constraints                                      | Description                                                                  |
-| :-------------------- | :---------- | :----------------------------------------------- | :--------------------------------------------------------------------------- |
-| `id`                  | `TEXT`      | `PRIMARY KEY NOT NULL`                           | UUID v4 job identifier                                                       |
-| `video_id`            | `INTEGER`   | `NOT NULL`, `FK -> videos(id) ON DELETE CASCADE` | Target video                                                                 |
-| `format_id`           | `INTEGER`   | Nullable, `FK -> formats(id) ON DELETE SET NULL` | Source format row (`SET NULL` if pruned on refresh)                          |
+| Column                | SQLite Type | Constraints                                          | Description                                                                  |
+| :-------------------- | :---------- | :--------------------------------------------------- | :--------------------------------------------------------------------------- |
+| `id`                  | `TEXT`      | `PRIMARY KEY NOT NULL`                               | UUID v4 job identifier                                                       |
+| `video_id`            | `INTEGER`   | `NOT NULL`, `FK -> videos(id) ON DELETE CASCADE`     | Target video                                                                 |
+| `format_id`           | `INTEGER`   | Nullable, `FK -> formats(id) ON DELETE SET NULL`     | Source format row (`SET NULL` if pruned on refresh)                          |
 | `batch_item_id`       | `INTEGER`   | Nullable, `FK -> batch_items(id) ON DELETE SET NULL` | **New in V2:** Linked batch item if part of a batch                          |
-| `source_format_id`    | `TEXT`      | `NOT NULL`                                       | Snapshot of `yt-dlp` `format_id` string                                      |
-| `target_container`    | `TEXT`      | `NOT NULL`                                       | Output container (`mp4`, `webm`, `mkv`, `mp3`, `m4a`, `opus`, `flac`, `wav`) |
-| `target_bitrate_kbps` | `INTEGER`   | Nullable                                         | Target bitrate (`128`, `192`, `320`) for MP3 conversions                     |
-| `needs_merge`         | `INTEGER`   | `NOT NULL DEFAULT 0`                             | Boolean (`1` when video+audio merge or audio conversion is required)         |
-| `status`              | `TEXT`      | `NOT NULL DEFAULT 'queued'`                      | `'queued' \| 'running' \| 'done' \| 'failed' \| 'cancelled' \| 'paused'`     |
-| `progress_pct`        | `REAL`      | `NOT NULL DEFAULT 0`                             | Progress `0.0` .. `100.0`                                                    |
-| `error_code`          | `TEXT`      | Nullable                                         | Standardized error code when `failed`, `cancelled`, or `paused`              |
-| `error_message`       | `TEXT`      | Nullable                                         | Friendly error description                                                   |
-| `output_filename`     | `TEXT`      | `NOT NULL`                                       | Sanitized download filename                                                  |
-| `temp_filepath`       | `TEXT`      | Nullable                                         | Path to staged temp file (`NULL` once deleted)                               |
-| `bytes_total`         | `INTEGER`   | Nullable                                         | Final file size in bytes                                                     |
-| `created_at`          | `INTEGER`   | `NOT NULL`                                       | Epoch ms when enqueued                                                       |
-| `started_at`          | `INTEGER`   | Nullable                                         | Epoch ms when worker started                                                 |
-| `finished_at`         | `INTEGER`   | Nullable                                         | Epoch ms when terminal state reached                                         |
+| `source_format_id`    | `TEXT`      | `NOT NULL`                                           | Snapshot of `yt-dlp` `format_id` string                                      |
+| `target_container`    | `TEXT`      | `NOT NULL`                                           | Output container (`mp4`, `webm`, `mkv`, `mp3`, `m4a`, `opus`, `flac`, `wav`) |
+| `target_bitrate_kbps` | `INTEGER`   | Nullable                                             | Target bitrate (`128`, `192`, `320`) for MP3 conversions                     |
+| `needs_merge`         | `INTEGER`   | `NOT NULL DEFAULT 0`                                 | Boolean (`1` when video+audio merge or audio conversion is required)         |
+| `status`              | `TEXT`      | `NOT NULL DEFAULT 'queued'`                          | `'queued' \| 'running' \| 'done' \| 'failed' \| 'cancelled' \| 'paused'`     |
+| `progress_pct`        | `REAL`      | `NOT NULL DEFAULT 0`                                 | Progress `0.0` .. `100.0`                                                    |
+| `error_code`          | `TEXT`      | Nullable                                             | Standardized error code when `failed`, `cancelled`, or `paused`              |
+| `error_message`       | `TEXT`      | Nullable                                             | Friendly error description                                                   |
+| `output_filename`     | `TEXT`      | `NOT NULL`                                           | Sanitized download filename                                                  |
+| `temp_filepath`       | `TEXT`      | Nullable                                             | Path to staged temp file (`NULL` once deleted)                               |
+| `bytes_total`         | `INTEGER`   | Nullable                                             | Final file size in bytes                                                     |
+| `created_at`          | `INTEGER`   | `NOT NULL`                                           | Epoch ms when enqueued                                                       |
+| `started_at`          | `INTEGER`   | Nullable                                             | Epoch ms when worker started                                                 |
+| `finished_at`         | `INTEGER`   | Nullable                                             | Epoch ms when terminal state reached                                         |
 
 - **Indexes:**
   - `idx_download_jobs_status` (on `status`)
@@ -122,6 +122,7 @@ Tracks queued, active, completed, failed, cancelled, and paused download/merge/c
 ### 2.4 Existing Tables (`videos`, `formats`, `history`, `settings`)
 
 These tables retain their existing V1 definitions without breaking changes:
+
 - `videos`: Caches single-video metadata (11-character YouTube ID unique index).
 - `formats`: Normalized formats for cached videos (`idx_formats_video_format_unique`).
 - `history`: Last 50 completed downloads (`job_id` unique FK).

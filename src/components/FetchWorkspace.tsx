@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/src/components/ui/Badge";
 import { Button } from "@/src/components/ui/Button";
@@ -163,54 +162,51 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
     }
   }, []);
 
-  const fetchPlaylist = useCallback(
-    async (url: string, force = false) => {
-      setLastSubmittedUrl(url);
-      setFetching(true);
-      setFetchError(null);
-      setResult(null);
-      setCombinedPrompt(null);
+  const fetchPlaylist = useCallback(async (url: string, force = false) => {
+    setLastSubmittedUrl(url);
+    setFetching(true);
+    setFetchError(null);
+    setResult(null);
+    setCombinedPrompt(null);
 
-      try {
-        const response = await fetch("/api/playlist/fetch", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ url, forcePlaylist: force }),
-        });
+    try {
+      const response = await fetch("/api/playlist/fetch", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url, forcePlaylist: force }),
+      });
 
-        const payload = (await response.json()) as PlaylistFetchResult & ApiErrorPayload;
-        if (!response.ok) {
-          setFetchError({
-            code: payload.error?.code ?? "INTERNAL_ERROR",
-            message: payload.error?.message ?? "Failed to fetch playlist metadata.",
-          });
-          setPlaylistResult(null);
-          return;
-        }
-
-        if (payload.isCombined && !force) {
-          setCombinedPrompt({
-            url,
-            videoId: payload.videoId,
-            playlistId: payload.playlistId,
-          });
-          return;
-        }
-
-        if (payload.playlist) {
-          setPlaylistResult(payload.playlist);
-        }
-      } catch {
+      const payload = (await response.json()) as PlaylistFetchResult & ApiErrorPayload;
+      if (!response.ok) {
         setFetchError({
-          code: "INTERNAL_ERROR",
-          message: "Network error while fetching playlist metadata.",
+          code: payload.error?.code ?? "INTERNAL_ERROR",
+          message: payload.error?.message ?? "Failed to fetch playlist metadata.",
         });
-      } finally {
-        setFetching(false);
+        setPlaylistResult(null);
+        return;
       }
-    },
-    [],
-  );
+
+      if (payload.isCombined && !force) {
+        setCombinedPrompt({
+          url,
+          videoId: payload.videoId,
+          playlistId: payload.playlistId,
+        });
+        return;
+      }
+
+      if (payload.playlist) {
+        setPlaylistResult(payload.playlist);
+      }
+    } catch {
+      setFetchError({
+        code: "INTERNAL_ERROR",
+        message: "Network error while fetching playlist metadata.",
+      });
+    } finally {
+      setFetching(false);
+    }
+  }, []);
 
   const handleFetch = useCallback(
     async (url: string) => {
@@ -468,14 +464,6 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
                 </h2>
               </div>
               <div className="flex gap-2">
-                {fetchError.code === "UNAUTHORIZED" ? (
-                  <Link
-                    href="/unlock"
-                    className="retro-btn min-h-11 inline-flex items-center rounded-md bg-[var(--accent-teal)] px-3 py-2 font-display text-xs font-bold uppercase tracking-wider text-[var(--on-teal)] no-underline"
-                  >
-                    Unlock Deck
-                  </Link>
-                ) : null}
                 <Button
                   variant="surface"
                   size="sm"

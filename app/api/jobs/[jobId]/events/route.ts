@@ -8,7 +8,9 @@ const TERMINAL_STATUSES = new Set(["done", "failed", "cancelled"]);
 const encoder = new TextEncoder();
 
 function formatSseFrame(eventName: string, data: JobProgressEvent): Uint8Array {
-  return encoder.encode(`id: ${Date.now()}\nevent: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`);
+  return encoder.encode(
+    `id: ${Date.now()}\nevent: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`,
+  );
 }
 
 function eventNameForSnapshot(snapshot: JobProgressEvent): string {

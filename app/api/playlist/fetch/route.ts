@@ -18,13 +18,10 @@ export const POST = withApiHandler(
       const env = getEnv();
       getRateLimiter().enforce("fetch", ctx.clientIp, env.RATE_LIMIT_FETCH_PER_MIN);
 
-      const result = await playlistService.fetchPlaylistMetadata(
-        body.url,
-        {
-          forcePlaylist: body.forcePlaylist,
-          limit: body.limit,
-        },
-      );
+      const result = await playlistService.fetchPlaylistMetadata(body.url, {
+        forcePlaylist: body.forcePlaylist,
+        limit: body.limit,
+      });
 
       return jsonOk(result, ctx.requestId, 200);
     } catch (err) {

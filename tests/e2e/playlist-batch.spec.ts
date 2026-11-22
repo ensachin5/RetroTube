@@ -161,15 +161,14 @@ test.describe("RetroTube V2 Playlist & Batch E2E Flow", () => {
     await context.route("**/api/batch/**/zip*", async (route) => {
       // Minimal valid zip header bytes PK\x05\x06
       const minimalZip = Buffer.from([
-        0x50, 0x4b, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x50, 0x4b, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       ]);
       await route.fulfill({
         status: 200,
         headers: {
           "content-type": "application/zip",
-          "content-disposition":
-            'attachment; filename="Retro Wave Synth Tape Vol 1.zip"',
+          "content-disposition": 'attachment; filename="Retro Wave Synth Tape Vol 1.zip"',
         },
         body: minimalZip,
       });
@@ -215,9 +214,7 @@ test.describe("RetroTube V2 Playlist & Batch E2E Flow", () => {
     await startBatchBtn.click();
 
     // 9. Batch progress panel is displayed
-    await expect(
-      page.getByText(/Retro Wave Synth Tape Vol 1/i).first(),
-    ).toBeVisible();
+    await expect(page.getByText(/Retro Wave Synth Tape Vol 1/i).first()).toBeVisible();
     await expect(page.getByText("2 / 2 ready")).toBeVisible();
 
     // 10. Click Download ZIP button

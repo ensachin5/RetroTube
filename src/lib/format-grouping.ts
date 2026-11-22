@@ -183,7 +183,8 @@ const ERROR_COPY_MAP: Record<string, FriendlyErrorCopy> = {
   },
   PLAYLIST_NOT_SUPPORTED: {
     title: "Playlist URL Detected",
-    message: "Playlist URLs are not supported for single-video fetch. Switch to playlist mode.",
+    message:
+      "Playlist URLs are not supported for single-video fetch. Switch to playlist mode.",
     retryable: false,
   },
   PLAYLIST_EMPTY: {
@@ -193,7 +194,8 @@ const ERROR_COPY_MAP: Record<string, FriendlyErrorCopy> = {
   },
   PLAYLIST_TOO_LARGE: {
     title: "Playlist Limit Exceeded",
-    message: "This playlist exceeds the maximum item cap. Use the 'first N' option to load.",
+    message:
+      "This playlist exceeds the maximum item cap. Use the 'first N' option to load.",
     retryable: false,
   },
   ITEM_UNAVAILABLE: {
@@ -203,7 +205,8 @@ const ERROR_COPY_MAP: Record<string, FriendlyErrorCopy> = {
   },
   INSUFFICIENT_DISK: {
     title: "Low Disk Space",
-    message: "The server does not have sufficient temporary storage. Clean disk space to proceed.",
+    message:
+      "The server does not have sufficient temporary storage. Clean disk space to proceed.",
     retryable: true,
   },
   FILE_TOO_LARGE: {
@@ -278,11 +281,6 @@ const ERROR_COPY_MAP: Record<string, FriendlyErrorCopy> = {
     message:
       "The temporary file has expired from storage. Re-download to fetch it again.",
     retryable: true,
-  },
-  UNAUTHORIZED: {
-    title: "Deck Locked",
-    message: "This instance requires the APP_PASSWORD unlock cookie.",
-    retryable: false,
   },
   JOB_CANCELLED: {
     title: "Download Cancelled",

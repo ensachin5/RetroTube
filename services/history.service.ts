@@ -19,4 +19,9 @@ export const historyService = {
     historyRepo.deleteById(id);
     return { deleted: true, id };
   },
+
+  clearAll(): { cleared: number } {
+    const cleared = historyRepo.clearAll();
+    return { cleared };
+  },
 };

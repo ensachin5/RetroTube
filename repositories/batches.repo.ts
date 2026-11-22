@@ -19,12 +19,9 @@ export const batchesRepo = {
     return db.select().from(batches).where(eq(batches.id, batchId)).get() ?? null;
   },
 
-  findWithItemsById(
-    batchId: string,
-  ): { batch: BatchRow; items: BatchItemRow[] } | null {
+  findWithItemsById(batchId: string): { batch: BatchRow; items: BatchItemRow[] } | null {
     const db = getDb();
-    const batch =
-      db.select().from(batches).where(eq(batches.id, batchId)).get() ?? null;
+    const batch = db.select().from(batches).where(eq(batches.id, batchId)).get() ?? null;
     if (!batch) return null;
 
     const items = db
@@ -39,12 +36,7 @@ export const batchesRepo = {
 
   listRecent(limit = 20): BatchRow[] {
     const db = getDb();
-    return db
-      .select()
-      .from(batches)
-      .orderBy(desc(batches.createdAt))
-      .limit(limit)
-      .all();
+    return db.select().from(batches).orderBy(desc(batches.createdAt)).limit(limit).all();
   },
 
   updateStatus(

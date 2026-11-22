@@ -140,4 +140,10 @@ export const historyRepo = {
     const res = db.delete(history).where(eq(history.id, id)).run();
     return res.changes > 0;
   },
+
+  clearAll(): number {
+    const db = getDb();
+    const res = db.delete(history).run();
+    return res.changes;
+  },
 };

@@ -14,7 +14,6 @@ const envSchema = z.object({
   SERVER_SAVE_DIR: z.string().trim().default(""),
   FILE_TTL_MINUTES: z.coerce.number().int().min(5).max(10080).default(120),
   MIN_FREE_DISK_GB: z.coerce.number().min(0).default(5),
-  APP_PASSWORD: z.string().default(""),
   CACHE_TTL_SECONDS: z.coerce.number().int().min(0).max(86400).default(3600),
   RATE_LIMIT_FETCH_PER_MIN: z.coerce.number().int().min(1).max(1000).default(20),
   RATE_LIMIT_DOWNLOAD_PER_MIN: z.coerce.number().int().min(1).max(1000).default(10),
@@ -31,6 +30,7 @@ const envSchema = z.object({
   YTDLP_BUFFER_SIZE: z.string().trim().min(1).default("1024K"),
   YTDLP_PROXY: z.string().trim().default(""),
   YTDLP_COOKIES_FILE: z.string().trim().default(""),
+  YTDLP_COOKIES_FROM_BROWSER: z.string().trim().default(""),
   YTDLP_USE_ARIA2: z
     .preprocess((val) => val === "true" || val === "1" || val === true, z.boolean())
     .default(false),
@@ -59,7 +59,6 @@ export function getEnv(): AppEnv {
     SERVER_SAVE_DIR: emptyToUndefined(process.env.SERVER_SAVE_DIR) ?? "",
     FILE_TTL_MINUTES: emptyToUndefined(process.env.FILE_TTL_MINUTES),
     MIN_FREE_DISK_GB: emptyToUndefined(process.env.MIN_FREE_DISK_GB),
-    APP_PASSWORD: process.env.APP_PASSWORD ?? "",
     CACHE_TTL_SECONDS: emptyToUndefined(process.env.CACHE_TTL_SECONDS),
     RATE_LIMIT_FETCH_PER_MIN: emptyToUndefined(process.env.RATE_LIMIT_FETCH_PER_MIN),
     RATE_LIMIT_DOWNLOAD_PER_MIN: emptyToUndefined(
@@ -73,6 +72,8 @@ export function getEnv(): AppEnv {
     YTDLP_BUFFER_SIZE: emptyToUndefined(process.env.YTDLP_BUFFER_SIZE),
     YTDLP_PROXY: emptyToUndefined(process.env.YTDLP_PROXY) ?? "",
     YTDLP_COOKIES_FILE: emptyToUndefined(process.env.YTDLP_COOKIES_FILE) ?? "",
+    YTDLP_COOKIES_FROM_BROWSER:
+      emptyToUndefined(process.env.YTDLP_COOKIES_FROM_BROWSER) ?? "",
     YTDLP_USE_ARIA2: emptyToUndefined(process.env.YTDLP_USE_ARIA2),
   });
 }

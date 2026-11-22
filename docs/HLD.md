@@ -8,6 +8,7 @@
 ## 1. Overview
 
 **RetroTube V2** expands upon the lightweight, personal-use media archiver by adding two core pillars:
+
 1. **Full Playlist & Batch Download Support:** Instant listing of playlist metadata via `--flat-playlist`, interactive item selection, quality presets with automatic fallback, bounded concurrent execution (`BATCH_CONCURRENCY`), inter-item delay jitter to avoid rate limits, individual item download links, and on-the-fly streaming uncompressed ZIP (`STORE` mode, ZIP64).
 2. **Big-Video Reliability & Storage Guards:** Elimination of arbitrary video length restrictions in favor of soft configurable limits (`MAX_VIDEO_MINUTES`, `MAX_FILE_SIZE_GB`), pre-flight disk space reservation guards (`statfs` check with `MIN_FREE_DISK_GB` floor), backpressure-controlled HTTP Range/206 media streaming, 15-second SSE keepalive pulses for reverse-proxy resilience, stall detection, and resumable partial downloads (`--continue`).
 
@@ -183,25 +184,31 @@ flowchart TD
 
 ## 6. Architecture Decision Records (ADRs)
 
-### ADR-001: SQLite (`better-sqlite3` + Drizzle ORM) *(Retained from V1)*
+### ADR-001: SQLite (`better-sqlite3` + Drizzle ORM) _(Retained from V1)_
+
 Synchronous embedded SQLite in WAL mode with foreign keys enabled provides robust local persistence without operational overhead.
 
-### ADR-002: `child_process.spawn` with Argument Arrays *(Retained from V1)*
+### ADR-002: `child_process.spawn` with Argument Arrays _(Retained from V1)_
+
 Zero shell interpolation guarantees complete immunity from command injection vulnerabilities.
 
-### ADR-003: Temp-File Staging + HTTP Range Streaming *(Retained from V1)*
+### ADR-003: Temp-File Staging + HTTP Range Streaming _(Retained from V1)_
+
 Media is staged to disk to ensure valid `moov` atom placement, seekability, and accurate `Content-Length`.
 
-### ADR-004: Monotonic Multi-Stage Pipeline for Merges *(Retained from V1)*
+### ADR-004: Monotonic Multi-Stage Pipeline for Merges _(Retained from V1)_
+
 Explicit staged process execution guarantees monotonically increasing progress percentages for SSE updates.
 
-### ADR-005: Minimal Client JS + Hand-Written Service Worker *(Retained from V1)*
+### ADR-005: Minimal Client JS + Hand-Written Service Worker _(Retained from V1)_
+
 Zero external UI component libraries; hand-crafted service worker for predictable caching and offline support.
 
-### ADR-006: Optional HMAC-SHA256 Cookie Gate *(Retained from V1)*
+### ADR-006: Optional HMAC-SHA256 Cookie Gate _(Retained from V1)_
+
 Lightweight single-password protection for exposed web instances without requiring third-party auth services.
 
-### ADR-007: On-the-fly STORE Mode ZIP64 Streaming vs Temp Archive on Disk *(New in V2)*
+### ADR-007: On-the-fly STORE Mode ZIP64 Streaming vs Temp Archive on Disk _(New in V2)_
 
 - **Context:** Delivering 50–200 downloaded playlist tracks to a user as a single download can be done by (a) building a giant `.zip` file on disk first, (b) forcing the user to click 50 download links, or (c) streaming a ZIP archive on the fly.
 - **Decision:** Stream a ZIP archive dynamically using `STORE` mode (compression level 0) and `ZIP64` extensions directly from the staged media files into the HTTP response.
@@ -211,7 +218,7 @@ Lightweight single-password protection for exposed web instances without requiri
   3. Node.js stream backpressure ensures server RAM usage stays under 10 MB even for 10 GB+ archives.
 - **Trade-offs:** Browser cannot know the exact total ZIP `Content-Length` in advance without a pre-scan (uses `Transfer-Encoding: chunked`), but downloads start instantly without waiting for compression.
 
-### ADR-008: Temp-File Staging with Range/206 Streaming for Big Files over In-Memory Buffering *(New in V2)*
+### ADR-008: Temp-File Staging with Range/206 Streaming for Big Files over In-Memory Buffering _(New in V2)_
 
 - **Context:** Long YouTube videos (podcasts, livestreams, concert recordings) can range from 500 MB to 10+ GB. Buffering media in memory or attempting to pipe unseekable live stdout streams to the client causes out-of-memory crashes and broken MP4 playback.
 - **Decision:** Always download and process large files directly to `TEMP_DIR` on disk first. Once verified, serve them using Node.js file read streams with standard HTTP `Range` (`206 Partial Content`) support, while enforcing pre-flight disk reservation checks.

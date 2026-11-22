@@ -1,10 +1,7 @@
 import { getEnv } from "@/lib/env";
 import { AppError, ERROR_CODES } from "@/lib/errors";
 import { parseYouTubeUrl } from "@/lib/url.validator";
-import {
-  type RawYtDlpPlaylistEntry,
-  ytdlpService,
-} from "./ytdlp.service";
+import { type RawYtDlpPlaylistEntry, ytdlpService } from "./ytdlp.service";
 
 export interface PlaylistItemDTO {
   position: number;
@@ -33,10 +30,7 @@ export interface PlaylistFetchResult {
   prompt?: string;
 }
 
-function resolveThumbnail(
-  entry: RawYtDlpPlaylistEntry,
-  youtubeId: string,
-): string {
+function resolveThumbnail(entry: RawYtDlpPlaylistEntry, youtubeId: string): string {
   if (entry.thumbnails && entry.thumbnails.length > 0) {
     const last = entry.thumbnails[entry.thumbnails.length - 1];
     if (last?.url) return last.url;
@@ -108,16 +102,14 @@ export const playlistService = {
         : (parsedUrl.canonicalPlaylistUrl ??
           `https://www.youtube.com/playlist?list=${playlistId}`);
 
-    const rawData = await ytdlpService.inspectPlaylistFlat(
-      canonicalPlaylistUrl,
-      signal,
-    );
+    const rawData = await ytdlpService.inspectPlaylistFlat(canonicalPlaylistUrl, signal);
 
     if (!rawData || typeof rawData !== "object") {
       throw new AppError({
         code: ERROR_CODES.PLAYLIST_EMPTY,
         status: 404,
-        message: "Could not retrieve playlist metadata. The playlist may be empty or unavailable.",
+        message:
+          "Could not retrieve playlist metadata. The playlist may be empty or unavailable.",
       });
     }
 
@@ -140,11 +132,7 @@ export const playlistService = {
     }
 
     const cap = env.MAX_PLAYLIST_ITEMS;
-    if (
-      !options?.limit &&
-      rawEntries.length > cap &&
-      options?.limit === undefined
-    ) {
+    if (!options?.limit && rawEntries.length > cap && options?.limit === undefined) {
       throw new AppError({
         code: ERROR_CODES.PLAYLIST_TOO_LARGE,
         status: 422,
@@ -198,9 +186,7 @@ export const playlistService = {
 
     const title = rawData.title?.trim() || "Untitled Playlist";
     const channel =
-      rawData.channel?.trim() ||
-      rawData.uploader?.trim() ||
-      "Unknown Curator";
+      rawData.channel?.trim() || rawData.uploader?.trim() || "Unknown Curator";
 
     return {
       isCombined: false,

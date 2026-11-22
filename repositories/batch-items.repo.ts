@@ -1,10 +1,6 @@
 import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import {
-  batchItems,
-  type BatchItemRow,
-  type NewBatchItemRow,
-} from "@/db/schema";
+import { batchItems, type BatchItemRow, type NewBatchItemRow } from "@/db/schema";
 
 export const batchItemsRepo = {
   createMany(items: NewBatchItemRow[]): BatchItemRow[] {
@@ -71,9 +67,7 @@ export const batchItemsRepo = {
         status: "queued",
         errorCode: null,
       })
-      .where(
-        and(eq(batchItems.batchId, batchId), eq(batchItems.status, "failed")),
-      )
+      .where(and(eq(batchItems.batchId, batchId), eq(batchItems.status, "failed")))
       .run();
     return result.changes;
   },
@@ -84,9 +78,7 @@ export const batchItemsRepo = {
       db
         .select()
         .from(batchItems)
-        .where(
-          and(eq(batchItems.batchId, batchId), eq(batchItems.status, "queued")),
-        )
+        .where(and(eq(batchItems.batchId, batchId), eq(batchItems.status, "queued")))
         .orderBy(asc(batchItems.position))
         .limit(1)
         .get() ?? null

@@ -51,26 +51,19 @@ export function HistoryList({ initialItems }: HistoryListProps) {
     if (items.length === 0) return;
     setClearingAll(true);
     try {
-      const results = await Promise.allSettled(
-        items.map((item) => fetch(`/api/history/${item.id}`, { method: "DELETE" })),
-      );
-
-      const deletedIds = new Set<number>();
-      results.forEach((result, idx) => {
-        if (result.status === "fulfilled" && result.value.ok) {
-          const item = items[idx];
-          if (item) deletedIds.add(item.id);
-        }
-      });
-
-      setItems((prev) => prev.filter((item) => !deletedIds.has(item.id)));
-      setConfirmClearAll(false);
-      setToast({
-        message: "Cleared download history.",
-        tone: "success",
-      });
+      const res = await fetch("/api/history", { method: "DELETE" });
+      if (res.ok) {
+        setItems([]);
+        setConfirmClearAll(false);
+        setToast({
+          message: "Cleared download history.",
+          tone: "success",
+        });
+      } else {
+        setToast({ message: "Could not clear all entries.", tone: "error" });
+      }
     } catch {
-      setToast({ message: "Could not clear all entries.", tone: "error" });
+      setToast({ message: "Network error clearing history.", tone: "error" });
     } finally {
       setClearingAll(false);
     }

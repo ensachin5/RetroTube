@@ -79,7 +79,6 @@ export function buildNumberedBatchFilename(params: {
   return `${pad} - ${base}.${ext}`;
 }
 
-
 function toAsciiFallback(filename: string): string {
   const ascii = filename
     .normalize("NFKD")

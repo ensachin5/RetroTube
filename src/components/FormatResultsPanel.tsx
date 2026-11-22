@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useMemo } from "react";
 import { Badge } from "@/src/components/ui/Badge";
 import { Button } from "@/src/components/ui/Button";
 import { Card } from "@/src/components/ui/Card";
@@ -83,10 +84,29 @@ export function FormatResultsPanel({
     },
   ];
 
+  const bestVideoFormat = useMemo(() => {
+    for (const group of videoGrouped.groups) {
+      const found = group.formats.find((f) => f.id === videoGrouped.bestFormatId);
+      if (found) return found;
+    }
+    return videoGrouped.groups[0]?.formats[0] ?? null;
+  }, [videoGrouped]);
+
+  const bestAudioFormat = useMemo(() => {
+    for (const group of audioGrouped.groups) {
+      const found = group.formats.find((f) => f.id === audioGrouped.bestFormatId);
+      if (found) return found;
+    }
+    return result.audioFormats[0] ?? null;
+  }, [audioGrouped, result.audioFormats]);
+
   return (
     <section aria-label="Video details and formats" className="space-y-5">
       {result.hadPlaylistParam ? (
-        <Card tone="alt" className="px-4 py-3 text-sm font-medium flex flex-wrap items-center justify-between gap-3">
+        <Card
+          tone="alt"
+          className="px-4 py-3 text-sm font-medium flex flex-wrap items-center justify-between gap-3"
+        >
           <span>This video belongs to a playlist.</span>
           {onLoadPlaylist ? (
             <Button
@@ -165,6 +185,80 @@ export function FormatResultsPanel({
         </div>
       </Card>
 
+      {/* Best Quality Quick Action Card */}
+      {(bestVideoFormat || bestAudioFormat) ? (
+        <Card
+          tone="alt"
+          className="p-4 sm:p-5 border-2 border-[var(--border-ink)] shadow-[var(--shadow-retro-sm)] bg-[var(--bg-surface-alt)]"
+        >
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Badge tone="mustard">⭐ Best Quality Available</Badge>
+                <span className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  Maximum Resolution & Bitrate
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-[var(--text-ink)] pt-0.5">
+                {bestVideoFormat ? (
+                  <span>
+                    🎬 <strong>{bestVideoFormat.resolution || `${bestVideoFormat.height}p`}</strong>
+                    {bestVideoFormat.fps ? ` · ${bestVideoFormat.fps} FPS` : ""}
+                    {bestVideoFormat.isHdr ? " · HDR" : ""}
+                    {bestVideoFormat.filesizeBytes ? ` · ${formatBytes(bestVideoFormat.filesizeBytes)}` : ""}
+                  </span>
+                ) : null}
+                {bestVideoFormat && bestAudioFormat ? <span className="mx-2 text-[var(--text-muted)]">|</span> : null}
+                {bestAudioFormat ? (
+                  <span>
+                    🎵 <strong>{shortCodecName(bestAudioFormat.acodec)}</strong>
+                    {bestAudioFormat.bitrateKbps ? ` · ${Math.round(bestAudioFormat.bitrateKbps)} kbps` : ""}
+                  </span>
+                ) : null}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              {bestVideoFormat ? (
+                <Button
+                  variant="primary"
+                  size="md"
+                  disabled={startingJob}
+                  onClick={() =>
+                    onStartDownload({
+                      kind: "video",
+                      format: bestVideoFormat,
+                      label: `${bestVideoFormat.resolution ?? "Best Video"} ${bestVideoFormat.recommendedContainer.toUpperCase()}`,
+                    })
+                  }
+                  className="font-bold uppercase tracking-wider flex-1 sm:flex-initial"
+                >
+                  ⚡ Download Best Video ({bestVideoFormat.resolution || `${bestVideoFormat.height}p`})
+                </Button>
+              ) : null}
+
+              {bestAudioFormat ? (
+                <Button
+                  variant="secondary"
+                  size="md"
+                  disabled={startingJob}
+                  onClick={() =>
+                    onStartDownload({
+                      kind: "audio",
+                      format: bestAudioFormat,
+                      label: `${shortCodecName(bestAudioFormat.acodec)} ${bestAudioFormat.bitrateKbps ?? ""}kbps`,
+                    })
+                  }
+                  className="font-bold uppercase tracking-wider flex-1 sm:flex-initial"
+                >
+                  🎵 Best Audio ({bestAudioFormat.bitrateKbps ? `${Math.round(bestAudioFormat.bitrateKbps)}k` : "Audio"})
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </Card>
+      ) : null}
+
       <Card className="p-4 sm:p-5">
         <Tabs
           idPrefix="formats"
@@ -241,14 +335,22 @@ export function FormatResultsPanel({
                                 ) : null}
                                 <span>#{fmt.formatId}</span>
                               </div>
-                              {fmt.filesizeBytes && fmt.filesizeBytes > 1024 * 1024 * 1024 ? (
+                              {fmt.filesizeBytes &&
+                              fmt.filesizeBytes > 1024 * 1024 * 1024 ? (
                                 <div className="text-[11px] font-mono text-[var(--accent-mustard)] flex items-center gap-1">
-                                  <span>⚠️ Large Tape (&gt;1 GB): High mobile data usage.</span>
+                                  <span>
+                                    ⚠️ Large Tape (&gt;1 GB): High mobile data usage.
+                                  </span>
                                 </div>
                               ) : null}
-                              {isIos && fmt.filesizeBytes && fmt.filesizeBytes > 2 * 1024 * 1024 * 1024 ? (
+                              {isIos &&
+                              fmt.filesizeBytes &&
+                              fmt.filesizeBytes > 2 * 1024 * 1024 * 1024 ? (
                                 <div className="text-[11px] font-mono text-[var(--accent-tomato)] flex items-center gap-1 p-1 rounded bg-[var(--bg-canvas)] border border-[var(--accent-tomato)]">
-                                  <span>📱 iOS Safari: Downloads &gt;2 GB may fail in mobile Safari. Desktop recommended.</span>
+                                  <span>
+                                    📱 iOS Safari: Downloads &gt;2 GB may fail in mobile
+                                    Safari. Desktop recommended.
+                                  </span>
                                 </div>
                               ) : null}
                             </button>

@@ -339,13 +339,13 @@ export function formatRowsToPresentation(
       const hdrDiff = Number(b.isHdr) - Number(a.isHdr);
       if (hdrDiff !== 0) return hdrDiff;
 
-      const muxedDiff = Number(b.acodec !== null) - Number(a.acodec !== null);
-      if (muxedDiff !== 0) return muxedDiff;
+      const bitrateDiff = (b.bitrateKbps ?? 0) - (a.bitrateKbps ?? 0);
+      if (bitrateDiff !== 0) return bitrateDiff;
 
       const mp4Diff = Number(b.container === "mp4") - Number(a.container === "mp4");
       if (mp4Diff !== 0) return mp4Diff;
 
-      return (b.bitrateKbps ?? 0) - (a.bitrateKbps ?? 0);
+      return (b.filesizeBytes ?? 0) - (a.filesizeBytes ?? 0);
     })
     .map((row) => ({
       id: row.id,
@@ -495,7 +495,9 @@ export function matchFormatForPreset(
     return {
       format: bestAudio,
       targetContainer: preferredContainer || bestAudio?.container || "m4a",
-      targetBitrateKbps: bestAudio?.bitrateKbps ? Math.round(bestAudio.bitrateKbps) : null,
+      targetBitrateKbps: bestAudio?.bitrateKbps
+        ? Math.round(bestAudio.bitrateKbps)
+        : null,
       needsMerge: false,
       actualQuality: `Best Audio (${bestAudio?.bitrateKbps ? Math.round(bestAudio.bitrateKbps) + "k" : bestAudio?.container || "audio"})`,
     };
@@ -565,4 +567,3 @@ export function matchFormatForPreset(
     actualQuality,
   };
 }
-
