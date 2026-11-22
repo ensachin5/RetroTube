@@ -3,6 +3,8 @@ import { AppError, ERROR_CODES } from "@/lib/errors";
 import { jsonOk, withApiHandler } from "@/lib/http";
 import { jobService } from "@/services/job.service";
 
+export const maxDuration = 60;
+
 const jobIdParamSchema = z.string().uuid("Invalid jobId.");
 
 export const POST = withApiHandler<{ jobId: string }>(

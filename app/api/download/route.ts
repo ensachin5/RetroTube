@@ -4,6 +4,8 @@ import { jsonOk, parseJsonBody, withApiHandler } from "@/lib/http";
 import { getRateLimiter } from "@/lib/rate-limiter";
 import { ALLOWED_TARGET_CONTAINERS, downloadService } from "@/services/download.service";
 
+export const maxDuration = 60;
+
 const downloadRequestSchema = z
   .object({
     videoId: z.coerce.number().int().positive("videoId must be a positive integer."),

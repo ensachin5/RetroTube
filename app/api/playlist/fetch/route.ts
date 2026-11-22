@@ -4,6 +4,8 @@ import { jsonOk, parseJsonBody, withApiHandler } from "@/lib/http";
 import { getRateLimiter } from "@/lib/rate-limiter";
 import { playlistService } from "@/services/playlist.service";
 
+export const maxDuration = 60;
+
 const fetchPlaylistSchema = z.object({
   url: z.string().trim().min(1, "Please provide a YouTube URL."),
   forcePlaylist: z.boolean().optional(),

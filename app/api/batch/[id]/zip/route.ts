@@ -6,6 +6,8 @@ import { batchesRepo } from "@/repositories/batches.repo";
 import { jobsRepo } from "@/repositories/jobs.repo";
 import { type ZipItemDescriptor, zipService } from "@/services/zip.service";
 
+export const maxDuration = 60;
+
 export async function GET(
   request: Request,
   routeContext: { params: Promise<{ id: string }> },

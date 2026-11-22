@@ -1,10 +1,15 @@
 import { z } from "zod";
+import { resolveBinaryPath } from "./binaries";
+
+const isVercel = process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
+const defaultDbPath = isVercel ? "/tmp/retrotube.db" : "./data/retrotube.db";
+const defaultTempDir = isVercel ? "/tmp/retrotube" : "./tmp/retrotube";
 
 const envSchema = z.object({
-  YTDLP_PATH: z.string().trim().min(1).default("yt-dlp"),
-  FFMPEG_PATH: z.string().trim().min(1).default("ffmpeg"),
-  TEMP_DIR: z.string().trim().min(1).default("./tmp/retrotube"),
-  DB_PATH: z.string().trim().min(1).default("./data/retrotube.db"),
+  YTDLP_PATH: z.string().trim().min(1).default(() => resolveBinaryPath("yt-dlp")),
+  FFMPEG_PATH: z.string().trim().min(1).default(() => resolveBinaryPath("ffmpeg")),
+  TEMP_DIR: z.string().trim().min(1).default(defaultTempDir),
+  DB_PATH: z.string().trim().min(1).default(defaultDbPath),
   MAX_CONCURRENT_JOBS: z.coerce.number().int().min(1).max(16).default(2),
   MAX_VIDEO_MINUTES: z.coerce.number().int().min(0).max(10080).default(0),
   MAX_FILE_SIZE_GB: z.coerce.number().min(0).default(0),

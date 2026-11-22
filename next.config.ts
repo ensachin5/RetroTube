@@ -7,6 +7,9 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   compress: true,
   serverExternalPackages: ["better-sqlite3"],
+  outputFileTracingIncludes: {
+    "/api/**/*": ["./bin/**/*", "./drizzle/**/*"],
+  },
   images: {
     remotePatterns: [
       {

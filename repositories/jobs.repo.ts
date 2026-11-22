@@ -38,6 +38,10 @@ export const jobsRepo = {
 
   transitionToRunning(jobId: string, startedAt = Date.now()): DownloadJobRow | null {
     const db = getDb();
+    const existing = db.select().from(downloadJobs).where(eq(downloadJobs.id, jobId)).get();
+    if (!existing) return null;
+    if (existing.status === "running") return existing;
+
     return (
       db
         .update(downloadJobs)

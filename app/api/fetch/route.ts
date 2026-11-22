@@ -4,6 +4,8 @@ import { jsonOk, parseJsonBody, withApiHandler } from "@/lib/http";
 import { getRateLimiter } from "@/lib/rate-limiter";
 import { fetchService } from "@/services/fetch.service";
 
+export const maxDuration = 60;
+
 const fetchRequestSchema = z.object({
   url: z.string().trim().min(1, "Please enter a YouTube URL."),
 });

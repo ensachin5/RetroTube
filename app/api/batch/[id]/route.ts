@@ -4,6 +4,8 @@ import { withApiHandler } from "@/lib/http";
 import { batchesRepo } from "@/repositories/batches.repo";
 import { jobsRepo } from "@/repositories/jobs.repo";
 
+export const maxDuration = 60;
+
 export const GET = withApiHandler<{ id: string }>(
   { route: "/api/batch/[id]" },
   async (_request, _ctx, { params }) => {

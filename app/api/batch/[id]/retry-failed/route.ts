@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { withApiHandler } from "@/lib/http";
 import { batchService } from "@/services/batch.service";
 
+export const maxDuration = 60;
+
 export const POST = withApiHandler<{ id: string }>(
   { route: "/api/batch/[id]/retry-failed" },
   async (_request, _ctx, { params }) => {

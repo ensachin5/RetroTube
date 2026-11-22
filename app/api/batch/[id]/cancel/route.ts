@@ -3,6 +3,8 @@ import { AppError, ERROR_CODES } from "@/lib/errors";
 import { withApiHandler } from "@/lib/http";
 import { batchService } from "@/services/batch.service";
 
+export const maxDuration = 60;
+
 export const POST = withApiHandler<{ id: string }>(
   { route: "/api/batch/[id]/cancel" },
   async (_request, _ctx, { params }) => {

@@ -3,6 +3,8 @@ import { AppError, ERROR_CODES } from "@/lib/errors";
 import { withApiHandler } from "@/lib/http";
 import { jobService, type JobProgressEvent } from "@/services/job.service";
 
+export const maxDuration = 60;
+
 const jobIdParamSchema = z.string().uuid("Invalid jobId.");
 const TERMINAL_STATUSES = new Set(["done", "failed", "cancelled"]);
 const encoder = new TextEncoder();
@@ -40,6 +42,11 @@ export const GET = withApiHandler<{ jobId: string }>(
         status: 404,
         message: "Download job was not found.",
       });
+    }
+
+    // In serverless environments, ensure the current active worker is running this job
+    if (snapshot.status === "queued" || snapshot.status === "running") {
+      jobService.ensureJobRunning(parsed.data);
     }
 
     let unsubscribe: (() => void) | null = null;

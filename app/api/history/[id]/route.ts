@@ -3,6 +3,8 @@ import { AppError, ERROR_CODES } from "@/lib/errors";
 import { jsonOk, withApiHandler } from "@/lib/http";
 import { historyService } from "@/services/history.service";
 
+export const maxDuration = 60;
+
 const idParamSchema = z.coerce.number().int().positive("Invalid history id.");
 
 export const DELETE = withApiHandler<{ id: string }>(

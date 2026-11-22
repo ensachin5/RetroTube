@@ -1,5 +1,7 @@
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import type { FormatRow } from "@/db/schema";
+import { ensureYtDlpBinary } from "@/lib/binaries";
 import { getEnv } from "@/lib/env";
 import { AppError, ERROR_CODES } from "@/lib/errors";
 import { buildContentDisposition, buildSafeOutputFilename } from "@/lib/filename";
@@ -10,6 +12,7 @@ import { jobsRepo } from "@/repositories/jobs.repo";
 import { videosRepo } from "@/repositories/videos.repo";
 import { diskService } from "./disk.service";
 import { jobService } from "./job.service";
+import { killProcessTree } from "./process.util";
 
 export const ALLOWED_TARGET_CONTAINERS = [
   "mp4",
@@ -390,6 +393,108 @@ export const downloadService = {
     return {
       status,
       headers,
+      body,
+    };
+  },
+
+  async streamDirect(params: {
+    canonicalUrl: string;
+    formatSelector: string;
+    outputFilename: string;
+    targetContainer: string;
+    signal?: AbortSignal;
+  }): Promise<StreamPreparedResult> {
+    const env = getEnv();
+    const ytDlpPath = await ensureYtDlpBinary();
+
+    const args = [
+      "-o",
+      "-",
+      "--no-playlist",
+      "--no-warnings",
+      "--remote-components",
+      "ejs:github",
+      "--buffer-size",
+      env.YTDLP_BUFFER_SIZE,
+      "--socket-timeout",
+      "15",
+    ];
+
+    if (env.YTDLP_COOKIES_FILE) {
+      args.push("--cookies", env.YTDLP_COOKIES_FILE);
+    }
+    if (env.YTDLP_COOKIES_FROM_BROWSER) {
+      args.push("--cookies-from-browser", env.YTDLP_COOKIES_FROM_BROWSER);
+    }
+    if (env.YTDLP_PROXY) {
+      args.push("--proxy", env.YTDLP_PROXY);
+    }
+    args.push("-f", params.formatSelector, params.canonicalUrl);
+
+    const child = spawn(ytDlpPath, args, {
+      shell: false,
+      detached: process.platform !== "win32",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    const onAbort = () => {
+      killProcessTree(child, "SIGKILL");
+    };
+    params.signal?.addEventListener("abort", onAbort, { once: true });
+
+    let isClosed = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        child.stdout.on("data", (chunk: Buffer | Uint8Array) => {
+          if (isClosed) return;
+          controller.enqueue(new Uint8Array(chunk));
+        });
+
+        child.stdout.on("end", () => {
+          if (isClosed) return;
+          isClosed = true;
+          params.signal?.removeEventListener("abort", onAbort);
+          controller.close();
+        });
+
+        child.stdout.on("error", (err) => {
+          if (isClosed) return;
+          isClosed = true;
+          params.signal?.removeEventListener("abort", onAbort);
+          controller.error(err);
+        });
+
+        child.on("close", (code) => {
+          if (isClosed) return;
+          isClosed = true;
+          params.signal?.removeEventListener("abort", onAbort);
+          if (code !== 0 && code !== null) {
+            controller.error(new Error(`yt-dlp exited with code ${code}`));
+          } else {
+            controller.close();
+          }
+        });
+      },
+      cancel() {
+        if (!isClosed) {
+          isClosed = true;
+          params.signal?.removeEventListener("abort", onAbort);
+          killProcessTree(child, "SIGKILL");
+        }
+      },
+    });
+
+    const mimeType = getMimeTypeForContainer(params.targetContainer);
+    const contentDisposition = buildContentDisposition(params.outputFilename);
+
+    return {
+      status: 200,
+      headers: {
+        "Content-Type": mimeType,
+        "Content-Disposition": contentDisposition,
+        "Cache-Control": "private, no-cache, no-store, must-revalidate",
+        "X-Accel-Buffering": "no",
+      },
       body,
     };
   },

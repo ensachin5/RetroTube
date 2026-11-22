@@ -3,6 +3,8 @@ import { AppError, ERROR_CODES } from "@/lib/errors";
 import { withApiHandler } from "@/lib/http";
 import { downloadService } from "@/services/download.service";
 
+export const maxDuration = 60;
+
 const jobIdParamSchema = z.string().uuid("Invalid jobId.");
 
 export const GET = withApiHandler<{ jobId: string }>(

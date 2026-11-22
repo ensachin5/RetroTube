@@ -4,6 +4,8 @@ import { getOrCreateRequestId } from "@/lib/http";
 import { batchesRepo } from "@/repositories/batches.repo";
 import { type BatchEvent, batchService } from "@/services/batch.service";
 
+export const maxDuration = 60;
+
 export async function GET(
   request: NextRequest,
   routeContext: { params: Promise<{ id: string }> },

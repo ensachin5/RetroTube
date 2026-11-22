@@ -19,12 +19,26 @@ const globalForDb = globalThis as typeof globalThis & {
   __retrotubeDb?: DbSingleton;
 };
 
-function ensureDbParentDirectory(dbPath: string): void {
+function ensureDbParentDirectory(dbPath: string): string {
   if (dbPath === ":memory:" || dbPath.startsWith("file:")) {
-    return;
+    return dbPath;
   }
-  const dir = path.dirname(path.resolve(dbPath));
-  fs.mkdirSync(dir, { recursive: true });
+  const resolved = path.resolve(dbPath);
+  const dir = path.dirname(resolved);
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    return resolved;
+  } catch {
+    // If directory creation fails due to read-only filesystem (e.g. on Vercel), fallback to /tmp
+    const tmpFallback = path.join("/tmp", path.basename(dbPath));
+    const tmpDir = path.dirname(tmpFallback);
+    try {
+      fs.mkdirSync(tmpDir, { recursive: true });
+    } catch {
+      // Ignore /tmp creation error if it already exists
+    }
+    return tmpFallback;
+  }
 }
 
 function configurePragmas(sqlite: Database.Database): void {
@@ -38,13 +52,13 @@ function configurePragmas(sqlite: Database.Database): void {
 }
 
 function createDbSingleton(dbPath: string): DbSingleton {
-  ensureDbParentDirectory(dbPath);
-  const sqlite = new Database(dbPath);
+  const safePath = ensureDbParentDirectory(dbPath);
+  const sqlite = new Database(safePath);
   configurePragmas(sqlite);
   const db = drizzle(sqlite, { schema });
   runDatabaseMigrations(db);
   return {
-    dbPath,
+    dbPath: safePath,
     sqlite,
     db,
     migrated: true,

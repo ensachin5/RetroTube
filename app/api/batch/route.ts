@@ -4,6 +4,8 @@ import { jsonOk, parseJsonBody, withApiHandler } from "@/lib/http";
 import { getRateLimiter } from "@/lib/rate-limiter";
 import { batchService } from "@/services/batch.service";
 
+export const maxDuration = 60;
+
 const playlistItemSchema = z.object({
   position: z.number().int().min(1),
   youtubeId: z.string().min(1),

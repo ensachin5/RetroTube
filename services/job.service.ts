@@ -164,6 +164,21 @@ class JobServiceImpl {
     this.drainQueue();
   }
 
+  public ensureJobRunning(jobId: string): void {
+    if (this.activeAbortControllers.has(jobId)) {
+      return;
+    }
+    const job = jobsRepo.findById(jobId);
+    if (!job) return;
+
+    if (job.status === "queued" || job.status === "running") {
+      if (!this.queue.includes(jobId)) {
+        this.queue.push(jobId);
+      }
+      this.drainQueue();
+    }
+  }
+
   public subscribe(
     jobId: string,
     listener: (event: JobProgressEvent) => void,
@@ -442,7 +457,7 @@ class JobServiceImpl {
     if (!record) return;
 
     const { job, video } = record;
-    if (job.status !== "queued") {
+    if (job.status !== "queued" && job.status !== "running") {
       return;
     }
 
