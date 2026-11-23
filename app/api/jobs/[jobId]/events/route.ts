@@ -9,10 +9,12 @@ const jobIdParamSchema = z.string().uuid("Invalid jobId.");
 const TERMINAL_STATUSES = new Set(["done", "failed", "cancelled"]);
 const encoder = new TextEncoder();
 
+function formatSseString(eventName: string, data: JobProgressEvent): string {
+  return `id: ${Date.now()}\nevent: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
 function formatSseFrame(eventName: string, data: JobProgressEvent): Uint8Array {
-  return encoder.encode(
-    `id: ${Date.now()}\nevent: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`,
-  );
+  return encoder.encode(formatSseString(eventName, data));
 }
 
 function eventNameForSnapshot(snapshot: JobProgressEvent): string {
@@ -37,11 +39,25 @@ export const GET = withApiHandler<{ jobId: string }>(
 
     const snapshot = jobService.getSnapshot(parsed.data);
     if (!snapshot) {
-      throw new AppError({
-        code: ERROR_CODES.JOB_NOT_FOUND,
-        status: 404,
-        message: "Download job was not found.",
-      });
+      // In serverless multi-instance environments, the job may have been started on another instance.
+      // Send a clean SSE event and close, preventing repeated 404 connection aborts.
+      return new Response(
+        formatSseString("failed", {
+          jobId: parsed.data,
+          status: "failed",
+          stage: "failed",
+          progressPct: 0,
+          errorCode: "JOB_EXPIRED",
+          errorMessage: "Job session ended. Please use Direct Download.",
+        }),
+        {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+          },
+        },
+      );
     }
 
     // In serverless environments, ensure the current active worker is running this job

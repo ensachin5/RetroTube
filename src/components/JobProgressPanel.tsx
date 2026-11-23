@@ -139,9 +139,10 @@ export function JobProgressPanel({
     try {
       await fetch(`/api/jobs/${job.jobId}/cancel`, { method: "POST" });
     } catch {
-      setConnectionWarning("Could not send cancel signal. Try again.");
+      // Ignore
     } finally {
       setCancelling(false);
+      onDismiss();
     }
   };
 
@@ -208,16 +209,25 @@ export function JobProgressPanel({
             className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--border-ink)] bg-[var(--bg-surface-alt)] px-3 py-2 text-xs sm:text-sm"
           >
             <span>{connectionWarning}</span>
-            <Button
-              size="sm"
-              variant="surface"
-              onClick={() => {
-                setConnectionWarning(null);
-                setReconnectNonce((n) => n + 1);
-              }}
-            >
-              Reconnect
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="surface"
+                onClick={() => {
+                  setConnectionWarning(null);
+                  setReconnectNonce((n) => n + 1);
+                }}
+              >
+                Reconnect
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onDismiss}
+              >
+                Dismiss
+              </Button>
+            </div>
           </div>
         ) : null}
 
