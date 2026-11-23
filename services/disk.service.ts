@@ -106,9 +106,16 @@ export const diskService = {
   async checkAvailableDisk(requiredBytes: number): Promise<DiskCheckResult> {
     const env = getEnv();
     const stats = await this.getStorageStats();
-    const reserveBytes = env.MIN_FREE_DISK_GB * 1024 * 1024 * 1024;
+    const isServerless =
+      process.env.VERCEL === "1" ||
+      Boolean(process.env.VERCEL_ENV) ||
+      Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
+
+    // On serverless hosts (Vercel/AWS Lambda), the file streams straight to the user's browser/disk.
+    // We do not hold a multi-GB server disk reserve.
+    const reserveBytes = isServerless ? 0 : env.MIN_FREE_DISK_GB * 1024 * 1024 * 1024;
     const effectiveAvailable = Math.max(0, stats.diskFreeBytes - reserveBytes);
-    const hasSufficientSpace = effectiveAvailable >= requiredBytes;
+    const hasSufficientSpace = isServerless ? true : effectiveAvailable >= requiredBytes;
 
     return {
       hasSufficientSpace,
@@ -122,6 +129,17 @@ export const diskService = {
   },
 
   async assertSufficientDisk(requiredBytes: number): Promise<void> {
+    const isServerless =
+      process.env.VERCEL === "1" ||
+      Boolean(process.env.VERCEL_ENV) ||
+      Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
+
+    // In serverless environments (Vercel / Lambda), media streams directly to the user's
+    // device storage. Bypass blocking server disk assertion completely.
+    if (isServerless) {
+      return;
+    }
+
     let check = await this.checkAvailableDisk(requiredBytes);
     if (!check.hasSufficientSpace) {
       try {
@@ -133,15 +151,10 @@ export const diskService = {
     }
 
     if (!check.hasSufficientSpace) {
-      const isVercel = process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
-      const hint =
-        isVercel && check.requiredMb > 450
-          ? " (Note: Vercel serverless has a 500 MB /tmp limit. For large 4K files, select 720p/1080p or audio)."
-          : "";
       throw new AppError({
         code: ERROR_CODES.INSUFFICIENT_DISK,
         status: 507,
-        message: `Insufficient disk space: this operation requires ~${check.requiredMb} MB but only ${check.availableMb} MB is free (${check.reserveMb} MB kept in reserve).${hint}`,
+        message: `Insufficient disk space: this operation requires ~${check.requiredMb} MB but only ${check.availableMb} MB is free (${check.reserveMb} MB kept in reserve).`,
         details: check,
       });
     }
