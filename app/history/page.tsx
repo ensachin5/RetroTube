@@ -40,7 +40,7 @@ export default function HistoryPage() {
           Tape Log & History
         </h1>
         <p className="text-sm sm:text-base text-[var(--text-muted)]">
-          Your last 50 local downloads stored in SQLite for quick re-download or cleanup.
+          Your downloaded tracks and videos saved on your device for quick access.
         </p>
       </header>
 

@@ -53,6 +53,7 @@ export interface FormatResultsPanelProps {
   selectedAction: SelectedAction | null;
   onSelectAction: (action: SelectedAction) => void;
   onStartDownload: (action: SelectedAction) => void;
+  onDirectDownload?: (action: SelectedAction) => void;
   startingJob: boolean;
   sourceUrl?: string;
   onLoadPlaylist?: (url: string) => void;
@@ -67,6 +68,7 @@ export function FormatResultsPanel({
   selectedAction,
   onSelectAction,
   onStartDownload,
+  onDirectDownload,
   startingJob,
   sourceUrl,
   onLoadPlaylist,
@@ -224,6 +226,52 @@ export function FormatResultsPanel({
                   variant="primary"
                   size="md"
                   disabled={startingJob}
+                  onClick={() => {
+                    const action: SelectedAction = {
+                      kind: "video",
+                      format: bestVideoFormat,
+                      label: `${bestVideoFormat.resolution ?? "Best Video"} ${bestVideoFormat.recommendedContainer.toUpperCase()}`,
+                    };
+                    if (onDirectDownload) {
+                      onDirectDownload(action);
+                    } else {
+                      onStartDownload(action);
+                    }
+                  }}
+                  className="font-bold uppercase tracking-wider flex-1 sm:flex-initial"
+                >
+                  ⚡ Direct Download ({bestVideoFormat.resolution || `${bestVideoFormat.height}p`})
+                </Button>
+              ) : null}
+
+              {bestAudioFormat ? (
+                <Button
+                  variant="secondary"
+                  size="md"
+                  disabled={startingJob}
+                  onClick={() => {
+                    const action: SelectedAction = {
+                      kind: "audio",
+                      format: bestAudioFormat,
+                      label: `${shortCodecName(bestAudioFormat.acodec)} ${bestAudioFormat.bitrateKbps ?? ""}kbps`,
+                    };
+                    if (onDirectDownload) {
+                      onDirectDownload(action);
+                    } else {
+                      onStartDownload(action);
+                    }
+                  }}
+                  className="font-bold uppercase tracking-wider flex-1 sm:flex-initial"
+                >
+                  🎵 Direct Audio ({bestAudioFormat.bitrateKbps ? `${Math.round(bestAudioFormat.bitrateKbps)}k` : "Audio"})
+                </Button>
+              ) : null}
+
+              {bestVideoFormat ? (
+                <Button
+                  variant="surface"
+                  size="md"
+                  disabled={startingJob}
                   onClick={() =>
                     onStartDownload({
                       kind: "video",
@@ -233,25 +281,7 @@ export function FormatResultsPanel({
                   }
                   className="font-bold uppercase tracking-wider flex-1 sm:flex-initial"
                 >
-                  ⚡ Download Best Video ({bestVideoFormat.resolution || `${bestVideoFormat.height}p`})
-                </Button>
-              ) : null}
-
-              {bestAudioFormat ? (
-                <Button
-                  variant="secondary"
-                  size="md"
-                  disabled={startingJob}
-                  onClick={() =>
-                    onStartDownload({
-                      kind: "audio",
-                      format: bestAudioFormat,
-                      label: `${shortCodecName(bestAudioFormat.acodec)} ${bestAudioFormat.bitrateKbps ?? ""}kbps`,
-                    })
-                  }
-                  className="font-bold uppercase tracking-wider flex-1 sm:flex-initial"
-                >
-                  🎵 Best Audio ({bestAudioFormat.bitrateKbps ? `${Math.round(bestAudioFormat.bitrateKbps)}k` : "Audio"})
+                  📼 Tape Deck
                 </Button>
               ) : null}
             </div>
@@ -359,13 +389,18 @@ export function FormatResultsPanel({
                               variant={isBest ? "primary" : "secondary"}
                               size="sm"
                               disabled={startingJob}
-                              onClick={() =>
-                                onStartDownload({
+                              onClick={() => {
+                                const action: SelectedAction = {
                                   kind: "video",
                                   format: fmt,
                                   label: `${fmt.resolution ?? "Video"} ${fmt.recommendedContainer.toUpperCase()}`,
-                                })
-                              }
+                                };
+                                if (onDirectDownload) {
+                                  onDirectDownload(action);
+                                } else {
+                                  onStartDownload(action);
+                                }
+                              }}
                               className="w-full sm:w-auto shrink-0"
                             >
                               Download
@@ -392,13 +427,18 @@ export function FormatResultsPanel({
                         variant={preset.id === "mp3-320" ? "accent" : "surface"}
                         size="md"
                         disabled={startingJob}
-                        onClick={() =>
-                          onStartDownload({
+                        onClick={() => {
+                          const action: SelectedAction = {
                             kind: "conversion",
                             preset,
                             label: preset.label,
-                          })
-                        }
+                          };
+                          if (onDirectDownload) {
+                            onDirectDownload(action);
+                          } else {
+                            onStartDownload(action);
+                          }
+                        }}
                         className="justify-between"
                       >
                         <span>{preset.label}</span>
@@ -476,13 +516,18 @@ export function FormatResultsPanel({
                                 variant={isBest ? "primary" : "secondary"}
                                 size="sm"
                                 disabled={startingJob}
-                                onClick={() =>
-                                  onStartDownload({
+                                onClick={() => {
+                                  const action: SelectedAction = {
                                     kind: "audio",
                                     format: fmt,
                                     label: `${shortCodecName(fmt.acodec)} ${fmt.bitrateKbps ?? ""}kbps`,
-                                  })
-                                }
+                                  };
+                                  if (onDirectDownload) {
+                                    onDirectDownload(action);
+                                  } else {
+                                    onStartDownload(action);
+                                  }
+                                }}
                                 className="w-full sm:w-auto shrink-0"
                               >
                                 Download

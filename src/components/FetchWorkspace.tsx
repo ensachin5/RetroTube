@@ -20,6 +20,7 @@ import {
 import type { FetchVideoResponseDto } from "@/services/format.normalizer";
 import type { JobProgressEvent } from "@/services/job.service";
 import type { PlaylistDTO, PlaylistFetchResult } from "@/services/playlist.service";
+import { saveClientHistoryItem } from "@/src/lib/client-history";
 
 const FormatResultsPanel = dynamic(
   () =>
@@ -235,6 +236,61 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
     }
   }, [handleFetch, initialUrl]);
 
+  const handleDirectDownload = (action: SelectedAction) => {
+    if (!result) return;
+    const formatSelector =
+      action.kind === "video"
+        ? action.format.formatId
+        : action.kind === "audio"
+          ? action.format.formatId
+          : "bestaudio";
+    const container =
+      action.kind === "video"
+        ? action.format.recommendedContainer
+        : action.kind === "audio"
+          ? action.format.container
+          : action.preset.targetContainer;
+
+    const safeTitle = result.video.title.replace(/[/\\?%*:|"<>]/g, "_");
+    const outputFilename = `${safeTitle}.${container}`;
+    const directUrl = `/api/download/direct?v=${encodeURIComponent(result.video.youtubeId)}&format=${encodeURIComponent(formatSelector)}&container=${encodeURIComponent(container)}&title=${encodeURIComponent(result.video.title)}`;
+
+    saveClientHistoryItem({
+      jobId: `direct-${Date.now()}`,
+      outputFilename,
+      targetContainer: container,
+      targetBitrateKbps:
+        action.kind === "audio"
+          ? action.format.bitrateKbps ?? null
+          : action.kind === "conversion"
+            ? action.preset.bitrateKbps
+            : null,
+      sourceFormatId: formatSelector,
+      formatId: action.kind !== "conversion" ? action.format.id : null,
+      bytesSent: action.kind !== "conversion" ? (action.format.filesizeBytes ?? 0) : 0,
+      video: {
+        id: result.video.id,
+        youtubeId: result.video.youtubeId,
+        title: result.video.title,
+        channel: result.video.channel,
+        durationSec: result.video.durationSec,
+        thumbnailUrl: result.video.thumbnailUrl,
+      },
+    });
+
+    const anchor = document.createElement("a");
+    anchor.href = directUrl;
+    anchor.download = outputFilename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+
+    setToast({
+      message: "Streaming directly to your device storage!",
+      tone: "success",
+    });
+  };
+
   const startDownload = async (action: SelectedAction) => {
     if (!result) return;
     setSelectedAction(action);
@@ -274,6 +330,29 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
         });
         return;
       }
+
+      saveClientHistoryItem({
+        jobId: payload.jobId,
+        outputFilename: payload.outputFilename,
+        targetContainer: requestBody.targetContainer ?? "mp4",
+        targetBitrateKbps:
+          action.kind === "audio"
+            ? action.format.bitrateKbps ?? null
+            : action.kind === "conversion"
+              ? action.preset.bitrateKbps
+              : null,
+        sourceFormatId: action.kind !== "conversion" ? action.format.formatId : "bestaudio",
+        formatId: action.kind !== "conversion" ? action.format.id : null,
+        bytesSent: action.kind !== "conversion" ? (action.format.filesizeBytes ?? 0) : 0,
+        video: {
+          id: result.video.id,
+          youtubeId: result.video.youtubeId,
+          title: result.video.title,
+          channel: result.video.channel,
+          durationSec: result.video.durationSec,
+          thumbnailUrl: result.video.thumbnailUrl,
+        },
+      });
 
       setActiveJob({
         jobId: payload.jobId,
@@ -538,6 +617,7 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
           selectedAction={selectedAction}
           onSelectAction={setSelectedAction}
           onStartDownload={(action) => void startDownload(action)}
+          onDirectDownload={handleDirectDownload}
           startingJob={startingJob}
           sourceUrl={lastSubmittedUrl}
           onLoadPlaylist={(targetUrl) => void fetchPlaylist(targetUrl, true)}

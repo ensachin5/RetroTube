@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge } from "@/src/components/ui/Badge";
 import { Button } from "@/src/components/ui/Button";
 import { Card } from "@/src/components/ui/Card";
@@ -12,6 +12,11 @@ import {
   type ActiveDownloadJob,
 } from "@/src/components/JobProgressPanel";
 import { formatBytes, formatDuration } from "@/src/lib/format-grouping";
+import {
+  clearClientHistory,
+  getClientHistory,
+  removeClientHistoryItem,
+} from "@/src/lib/client-history";
 import type { HistoryItemWithDetails } from "@/repositories/history.repo";
 
 export interface HistoryListProps {
@@ -19,7 +24,21 @@ export interface HistoryListProps {
 }
 
 export function HistoryList({ initialItems }: HistoryListProps) {
-  const [items, setItems] = useState<HistoryItemWithDetails[]>(initialItems);
+  const [items, setItems] = useState<HistoryItemWithDetails[]>(() => {
+    if (typeof window !== "undefined") {
+      const local = getClientHistory();
+      if (local.length > 0) return local as unknown as HistoryItemWithDetails[];
+    }
+    return initialItems;
+  });
+
+  useEffect(() => {
+    const local = getClientHistory();
+    if (local.length > 0) {
+      setItems(local as unknown as HistoryItemWithDetails[]);
+    }
+  }, []);
+
   const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [clearingAll, setClearingAll] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -33,15 +52,10 @@ export function HistoryList({ initialItems }: HistoryListProps) {
   const handleDelete = async (id: number) => {
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/history/${id}`, { method: "DELETE" });
-      if (!res.ok) {
-        setToast({ message: "Failed to delete history entry.", tone: "error" });
-        return;
-      }
+      removeClientHistoryItem(id);
+      void fetch(`/api/history/${id}`, { method: "DELETE" }).catch(() => undefined);
       setItems((prev) => prev.filter((item) => item.id !== id));
       setToast({ message: "Entry removed from tape log.", tone: "info" });
-    } catch {
-      setToast({ message: "Network error deleting entry.", tone: "error" });
     } finally {
       setDeletingId(null);
     }
@@ -51,82 +65,37 @@ export function HistoryList({ initialItems }: HistoryListProps) {
     if (items.length === 0) return;
     setClearingAll(true);
     try {
-      const res = await fetch("/api/history", { method: "DELETE" });
-      if (res.ok) {
-        setItems([]);
-        setConfirmClearAll(false);
-        setToast({
-          message: "Cleared download history.",
-          tone: "success",
-        });
-      } else {
-        setToast({ message: "Could not clear all entries.", tone: "error" });
-      }
-    } catch {
-      setToast({ message: "Network error clearing history.", tone: "error" });
+      clearClientHistory();
+      void fetch("/api/history", { method: "DELETE" }).catch(() => undefined);
+      setItems([]);
+      setConfirmClearAll(false);
+      setToast({
+        message: "Cleared download history.",
+        tone: "success",
+      });
     } finally {
       setClearingAll(false);
     }
   };
 
+  const handleRedownloadDirect = (item: HistoryItemWithDetails) => {
+    const directUrl = `/api/download/direct?v=${encodeURIComponent(item.video.youtubeId)}&format=${encodeURIComponent(item.sourceFormatId || "best")}&container=${encodeURIComponent(item.targetContainer)}&title=${encodeURIComponent(item.video.title)}`;
+    const anchor = document.createElement("a");
+    anchor.href = directUrl;
+    anchor.download = item.outputFilename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    setToast({
+      message: "Streaming directly to your device...",
+      tone: "success",
+    });
+  };
+
   const handleRedownload = async (item: HistoryItemWithDetails) => {
     setRedownloadingId(item.id);
     try {
-      const payload = {
-        videoId: item.video.id,
-        formatId: item.formatId,
-        sourceFormatId: item.sourceFormatId,
-        targetContainer: item.targetContainer,
-        audioBitrateKbps: item.targetBitrateKbps,
-      };
-
-      let res = await fetch("/api/download", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      // If cached format expired/pruned, refresh metadata via /api/fetch first and retry
-      if (res.status === 400 || res.status === 404) {
-        const fetchRes = await fetch("/api/fetch", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            url: `https://www.youtube.com/watch?v=${item.video.youtubeId}`,
-          }),
-        });
-
-        if (fetchRes.ok) {
-          res = await fetch("/api/download", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              videoId: item.video.id,
-              sourceFormatId: item.sourceFormatId,
-              targetContainer: item.targetContainer,
-              audioBitrateKbps: item.targetBitrateKbps,
-            }),
-          });
-        }
-      }
-
-      const data = (await res.json()) as ActiveDownloadJob & {
-        error?: { message?: string };
-      };
-      if (!res.ok) {
-        setToast({
-          message: data.error?.message ?? "Could not start re-download.",
-          tone: "error",
-        });
-        return;
-      }
-
-      setActiveJob(data);
-    } catch {
-      setToast({
-        message: "Network error starting re-download.",
-        tone: "error",
-      });
+      handleRedownloadDirect(item);
     } finally {
       setRedownloadingId(null);
     }

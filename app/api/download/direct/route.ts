@@ -3,7 +3,7 @@ import { AppError, ERROR_CODES } from "@/lib/errors";
 import { withApiHandler } from "@/lib/http";
 import { downloadService } from "@/services/download.service";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const directDownloadSchema = z.object({
   v: z.string().trim().min(1, "Video ID or URL parameter 'v' is required."),

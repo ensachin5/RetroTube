@@ -465,6 +465,38 @@ class JobServiceImpl {
     if (!started) return;
 
     const tempDir = this.getTempDir();
+
+    // Aggressively clean up orphan part files and stale temp files from failed/cancelled jobs
+    // while preserving files belonging to currently running jobs or completed jobs waiting to be streamed
+    try {
+      const activeJobIds = new Set(this.activeAbortControllers.keys());
+      const doneJobsWithFiles = new Set(
+        jobsRepo
+          .listNonRunningWithTempFile()
+          .map((r) => r.tempFilepath && path.resolve(r.tempFilepath))
+          .filter((p): p is string => Boolean(p)),
+      );
+      const entries = await fsp.readdir(tempDir);
+      for (const entry of entries) {
+        if (entry.includes(jobId)) continue;
+        const belongsToActive = Array.from(activeJobIds).some((id) => entry.startsWith(id));
+        const fullPath = path.resolve(path.join(tempDir, entry));
+        if (belongsToActive || doneJobsWithFiles.has(fullPath)) continue;
+
+        if (
+          entry.includes(".part") ||
+          entry.endsWith(".mp4") ||
+          entry.endsWith(".webm") ||
+          entry.endsWith(".mkv") ||
+          entry.endsWith(".mp3")
+        ) {
+          await fsp.unlink(fullPath).catch(() => undefined);
+        }
+      }
+    } catch {
+      // Ignore cleanup error
+    }
+
     const finalOutputPath = path.join(
       /*turbopackIgnore: true*/ tempDir,
       `${jobId}.${job.targetContainer}`,
@@ -692,6 +724,7 @@ class JobServiceImpl {
         jobId,
         errorCode: appError.code,
         cause: appError.message,
+        details: appError.details,
       });
     }
   }

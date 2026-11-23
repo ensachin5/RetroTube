@@ -423,12 +423,27 @@ export const downloadService = {
       "15",
     ];
     args.push(...resolveExtractorArgs(env));
-
     args.push(...resolveCookiesArgs(env));
+
     if (env.YTDLP_PROXY) {
       args.push("--proxy", env.YTDLP_PROXY);
     }
-    args.push("-f", params.formatSelector, params.canonicalUrl);
+
+    const isAudio = ["mp3", "m4a", "opus", "flac", "wav"].includes(params.targetContainer);
+    if (isAudio) {
+      args.push("-x", "--audio-format", params.targetContainer);
+      if (params.formatSelector && params.formatSelector !== "best") {
+        args.push("-f", params.formatSelector);
+      }
+    } else {
+      let selector = params.formatSelector;
+      if (!selector.includes("+") && selector !== "best" && selector !== "b") {
+        selector = `${selector}+ba/b/${selector}`;
+      }
+      args.push("-f", selector);
+    }
+
+    args.push(params.canonicalUrl);
 
     const child = spawn(ytDlpPath, args, {
       shell: false,
@@ -442,6 +457,11 @@ export const downloadService = {
     params.signal?.addEventListener("abort", onAbort, { once: true });
 
     let isClosed = false;
+    let stderrBuffer = "";
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderrBuffer = (stderrBuffer + chunk.toString("utf8")).slice(-1000);
+    });
+
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
         child.stdout.on("data", (chunk: Buffer | Uint8Array) => {
@@ -468,7 +488,7 @@ export const downloadService = {
           isClosed = true;
           params.signal?.removeEventListener("abort", onAbort);
           if (code !== 0 && code !== null) {
-            controller.error(new Error(`yt-dlp exited with code ${code}`));
+            controller.error(new Error(`yt-dlp stream error (code ${code}): ${stderrBuffer.trim()}`));
           } else {
             controller.close();
           }
