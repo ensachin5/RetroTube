@@ -437,8 +437,18 @@ export const downloadService = {
       }
     } else {
       let selector = params.formatSelector;
-      if (!selector.includes("+") && selector !== "best" && selector !== "b") {
-        selector = `${selector}+ba/b/${selector}`;
+      if (
+        !selector.includes("+") &&
+        selector !== "best" &&
+        selector !== "b" &&
+        selector !== "18" &&
+        selector !== "22"
+      ) {
+        if (params.targetContainer === "webm") {
+          selector = `${selector}+ba[ext=webm]/bestvideo[ext=webm]+bestaudio[ext=webm]/best`;
+        } else {
+          selector = `${selector}+ba[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best`;
+        }
       }
       args.push("-f", selector);
     }

@@ -78,6 +78,13 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
   const [selectedAction, setSelectedAction] = useState<SelectedAction | null>(null);
   const [startingJob, setStartingJob] = useState(false);
   const [activeJob, setActiveJob] = useState<ActiveDownloadJob | null>(null);
+  const [activeDirectStream, setActiveDirectStream] = useState<{
+    directUrl: string;
+    outputFilename: string;
+    title: string;
+    qualityLabel: string;
+    container: string;
+  } | null>(null);
   const [, setJobSnapshot] = useState<JobProgressEvent | null>(null);
   const [activeBatchId, setActiveBatchId] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
@@ -278,15 +285,39 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
       },
     });
 
-    const anchor = document.createElement("a");
-    anchor.href = directUrl;
-    anchor.download = outputFilename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
+    setActiveDirectStream({
+      directUrl,
+      outputFilename,
+      title: result.video.title,
+      qualityLabel: action.label,
+      container,
+    });
+
+    try {
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.src = directUrl;
+      document.body.appendChild(iframe);
+      setTimeout(() => {
+        iframe.remove();
+      }, 30000);
+    } catch {
+      // Ignore iframe fallback
+    }
+
+    try {
+      const anchor = document.createElement("a");
+      anchor.href = directUrl;
+      anchor.download = outputFilename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      setTimeout(() => anchor.remove(), 100);
+    } catch {
+      // Ignore anchor fallback
+    }
 
     setToast({
-      message: "Streaming directly to your device storage!",
+      message: "Direct tape stream started! Check download progress below.",
       tone: "success",
     });
   };
@@ -508,6 +539,56 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
             onCancel={() => setPlaylistResult(null)}
             loading={startingJob}
           />
+        </section>
+      ) : null}
+
+      {/* Active Direct Stream Card */}
+      {activeDirectStream ? (
+        <section aria-label="Direct stream download active">
+          <Card
+            tone="alt"
+            className="p-4 sm:p-5 border-2 border-[var(--border-ink)] shadow-[var(--shadow-retro-sm)] bg-[var(--bg-surface-alt)] space-y-4"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Badge tone="teal">⚡ Live Stream to Device</Badge>
+                <Badge tone="mustard">{activeDirectStream.container.toUpperCase()}</Badge>
+              </div>
+              <Button
+                variant="surface"
+                size="sm"
+                onClick={() => setActiveDirectStream(null)}
+              >
+                Close
+              </Button>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-display font-bold text-base sm:text-lg text-[var(--text-ink)] line-clamp-1">
+                {activeDirectStream.title}
+              </h3>
+              <p className="text-xs sm:text-sm text-[var(--text-muted)] font-mono">
+                {activeDirectStream.outputFilename} · {activeDirectStream.qualityLabel}
+              </p>
+            </div>
+
+            <div className="py-2">
+              <TapeReelLoader label="Pulling stream directly into your device storage (0 MB server disk)..." />
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[var(--border-ink)]">
+              <span className="text-xs text-[var(--text-muted)]">
+                Downloaded directly to your browser tray. If it didn't trigger automatically:
+              </span>
+              <a
+                href={activeDirectStream.directUrl}
+                download={activeDirectStream.outputFilename}
+                className="retro-btn min-h-10 inline-flex items-center justify-center rounded-md bg-[var(--accent-teal)] px-4 py-2 font-display text-sm font-bold uppercase tracking-wider text-[var(--on-teal)] no-underline w-full sm:w-auto"
+              >
+                💾 Save File
+              </a>
+            </div>
+          </Card>
         </section>
       ) : null}
 
