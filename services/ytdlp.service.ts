@@ -11,19 +11,37 @@ export function resolveCookiesArgs(env: AppEnv): string[] {
     return ["--cookies", env.YTDLP_COOKIES_FILE];
   }
   if (env.YTDLP_COOKIES_TEXT) {
-    const tmpCookiePath = path.join("/tmp", "cookies.txt");
+    const isVercel = process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
+    const tmpDir = isVercel
+      ? "/tmp"
+      : process.env.TEMP_DIR && process.env.TEMP_DIR.startsWith("/tmp")
+        ? process.env.TEMP_DIR
+        : "/tmp";
+    const tmpCookiePath = path.join(tmpDir, "retrotube-cookies.txt");
     try {
-      fs.writeFileSync(tmpCookiePath, env.YTDLP_COOKIES_TEXT, { encoding: "utf8" });
+      fs.mkdirSync(path.dirname(tmpCookiePath), { recursive: true });
+      let content = env.YTDLP_COOKIES_TEXT;
+      if (!content.includes("\n") && content.includes("\\n")) {
+        content = content.replace(/\\n/g, "\n");
+      }
+      fs.writeFileSync(tmpCookiePath, content.trim() + "\n", { encoding: "utf8" });
       return ["--cookies", tmpCookiePath];
     } catch {
       // Ignore write error
     }
   }
   if (env.YTDLP_COOKIES_BASE64) {
-    const tmpCookiePath = path.join("/tmp", "cookies.txt");
+    const isVercel = process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
+    const tmpDir = isVercel
+      ? "/tmp"
+      : process.env.TEMP_DIR && process.env.TEMP_DIR.startsWith("/tmp")
+        ? process.env.TEMP_DIR
+        : "/tmp";
+    const tmpCookiePath = path.join(tmpDir, "retrotube-cookies.txt");
     try {
+      fs.mkdirSync(path.dirname(tmpCookiePath), { recursive: true });
       const decoded = Buffer.from(env.YTDLP_COOKIES_BASE64, "base64").toString("utf8");
-      fs.writeFileSync(tmpCookiePath, decoded, { encoding: "utf8" });
+      fs.writeFileSync(tmpCookiePath, decoded.trim() + "\n", { encoding: "utf8" });
       return ["--cookies", tmpCookiePath];
     } catch {
       // Ignore write error
@@ -33,6 +51,21 @@ export function resolveCookiesArgs(env: AppEnv): string[] {
     return ["--cookies-from-browser", env.YTDLP_COOKIES_FROM_BROWSER];
   }
   return [];
+}
+
+export function resolveExtractorArgs(env: AppEnv, clientOverride?: string): string[] {
+  if (env.YTDLP_EXTRACTOR_ARGS) {
+    return ["--extractor-args", env.YTDLP_EXTRACTOR_ARGS];
+  }
+  const client = clientOverride || env.YTDLP_PLAYER_CLIENT;
+  if (client) {
+    return ["--extractor-args", `youtube:player_client=${client};skip=translated_subs,comments`];
+  }
+  // Default: do not hardcode player_client=android,web.
+  // In modern yt-dlp, omitting player_client allows yt-dlp to use its resilient
+  // multi-client default ('tv_samsung', 'visionos', 'web') which does not get blocked
+  // by YouTube's android PO token requirements or cloud datacenter IP blocks.
+  return ["--extractor-args", "youtube:skip=translated_subs,comments"];
 }
 
 export interface DownloadProgressSample {
@@ -154,6 +187,7 @@ export function mapYtDlpStderrToError(stderr: string): AppError {
       status: 429,
       message:
         "YouTube temporarily rate-limited requests from this server. Please try again shortly.",
+      details: stderr ? { stderr: stderr.slice(-500) } : undefined,
     });
   }
 
@@ -203,36 +237,38 @@ export const ytdlpService = {
   async inspectVideo(canonicalUrl: string, signal?: AbortSignal): Promise<RawYtDlpInfo> {
     const env = getEnv();
     const ytDlpPath = await ensureYtDlpBinary();
-    const args = [
-      "-J",
-      "--no-playlist",
-      "--no-warnings",
-      "--no-check-formats",
-      "--skip-download",
-      "--remote-components",
-      "ejs:github",
-      "--js-runtimes",
-      "node",
-      "--no-write-comments",
-      "--no-write-thumbnail",
-      "--no-write-subs",
-      "--no-write-auto-subs",
-      "--extractor-args",
-      "youtube:player_client=android,web;skip=translated_subs,comments",
-      "--socket-timeout",
-      "10",
-    ];
-    args.push(...resolveCookiesArgs(env));
-    if (env.YTDLP_PROXY) {
-      args.push("--proxy", env.YTDLP_PROXY);
-    }
-    args.push(canonicalUrl);
+
+    const buildArgs = (clientOverride?: string) => {
+      const args = [
+        "-J",
+        "--no-playlist",
+        "--no-warnings",
+        "--no-check-formats",
+        "--skip-download",
+        "--remote-components",
+        "ejs:github",
+        "--js-runtimes",
+        "node",
+        "--no-write-comments",
+        "--no-write-thumbnail",
+        "--no-write-subs",
+        "--no-write-auto-subs",
+      ];
+      args.push(...resolveExtractorArgs(env, clientOverride));
+      args.push("--socket-timeout", "10");
+      args.push(...resolveCookiesArgs(env));
+      if (env.YTDLP_PROXY) {
+        args.push("--proxy", env.YTDLP_PROXY);
+      }
+      args.push(canonicalUrl);
+      return args;
+    };
 
     let result;
     try {
       result = await runSpawnedCommand({
         command: ytDlpPath,
-        args,
+        args: buildArgs(),
         timeoutMs: env.YTDLP_FETCH_TIMEOUT_MS,
         signal,
       });
@@ -261,17 +297,25 @@ export const ytdlpService = {
       });
     }
 
-    if (result.code !== 0) {
+    if (result.code !== 0 && !signal?.aborted) {
       const mapped = mapYtDlpStderrToError(result.stderr || result.stdout);
-      if (mapped.code === ERROR_CODES.RATE_LIMITED && !signal?.aborted) {
-        // Transient rate limit from YouTube: wait 1.5s and retry once automatically
-        await new Promise((res) => setTimeout(res, 1500));
-        result = await runSpawnedCommand({
-          command: ytDlpPath,
-          args,
-          timeoutMs: env.YTDLP_FETCH_TIMEOUT_MS,
-          signal,
-        });
+      if (mapped.code === ERROR_CODES.RATE_LIMITED) {
+        // If YouTube challenged the datacenter IP (429 or bot check), try fallback clients
+        const fallbackClients = ["tv_samsung,visionos", "tv_embedded,web", "ios,web"];
+        for (const fallback of fallbackClients) {
+          if (signal?.aborted) break;
+          await new Promise((res) => setTimeout(res, 800));
+          const fallbackResult = await runSpawnedCommand({
+            command: ytDlpPath,
+            args: buildArgs(fallback),
+            timeoutMs: env.YTDLP_FETCH_TIMEOUT_MS,
+            signal,
+          });
+          if (fallbackResult.code === 0) {
+            result = fallbackResult;
+            break;
+          }
+        }
       }
     }
 
@@ -308,37 +352,39 @@ export const ytdlpService = {
   ): Promise<RawYtDlpPlaylistInfo> {
     const env = getEnv();
     const ytDlpPath = await ensureYtDlpBinary();
-    const args = [
-      "-J",
-      "--flat-playlist",
-      "--no-warnings",
-      "--no-check-formats",
-      "--skip-download",
-      "--remote-components",
-      "ejs:github",
-      "--js-runtimes",
-      "node",
-      "--ignore-errors",
-      "--no-write-comments",
-      "--no-write-thumbnail",
-      "--no-write-subs",
-      "--no-write-auto-subs",
-      "--extractor-args",
-      "youtube:player_client=android,web;skip=translated_subs,comments",
-      "--socket-timeout",
-      "10",
-    ];
-    args.push(...resolveCookiesArgs(env));
-    if (env.YTDLP_PROXY) {
-      args.push("--proxy", env.YTDLP_PROXY);
-    }
-    args.push(canonicalPlaylistUrl);
+
+    const buildArgs = (clientOverride?: string) => {
+      const args = [
+        "-J",
+        "--flat-playlist",
+        "--no-warnings",
+        "--no-check-formats",
+        "--skip-download",
+        "--remote-components",
+        "ejs:github",
+        "--js-runtimes",
+        "node",
+        "--ignore-errors",
+        "--no-write-comments",
+        "--no-write-thumbnail",
+        "--no-write-subs",
+        "--no-write-auto-subs",
+      ];
+      args.push(...resolveExtractorArgs(env, clientOverride));
+      args.push("--socket-timeout", "10");
+      args.push(...resolveCookiesArgs(env));
+      if (env.YTDLP_PROXY) {
+        args.push("--proxy", env.YTDLP_PROXY);
+      }
+      args.push(canonicalPlaylistUrl);
+      return args;
+    };
 
     let result;
     try {
       result = await runSpawnedCommand({
         command: ytDlpPath,
-        args,
+        args: buildArgs(),
         timeoutMs: Math.max(30000, env.YTDLP_FETCH_TIMEOUT_MS * 2),
         signal,
       });
@@ -365,6 +411,27 @@ export const ytdlpService = {
         status: 499,
         message: "Playlist fetch was cancelled.",
       });
+    }
+
+    if (result.code !== 0 && !signal?.aborted) {
+      const mapped = mapYtDlpStderrToError(result.stderr || result.stdout);
+      if (mapped.code === ERROR_CODES.RATE_LIMITED) {
+        const fallbackClients = ["tv_samsung,visionos", "tv_embedded,web", "ios,web"];
+        for (const fallback of fallbackClients) {
+          if (signal?.aborted) break;
+          await new Promise((res) => setTimeout(res, 800));
+          const fallbackResult = await runSpawnedCommand({
+            command: ytDlpPath,
+            args: buildArgs(fallback),
+            timeoutMs: Math.max(30000, env.YTDLP_FETCH_TIMEOUT_MS * 2),
+            signal,
+          });
+          if (fallbackResult.code === 0) {
+            result = fallbackResult;
+            break;
+          }
+        }
+      }
     }
 
     if (result.code !== 0) {
@@ -432,9 +499,8 @@ export const ytdlpService = {
       "--fragment-retries",
       "5",
       "--no-mtime",
-      "--extractor-args",
-      "youtube:player_client=android,web;skip=translated_subs,comments",
     ];
+    args.push(...resolveExtractorArgs(env));
 
     if (env.YTDLP_HTTP_CHUNK_SIZE && env.YTDLP_HTTP_CHUNK_SIZE !== "none") {
       args.push("--http-chunk-size", env.YTDLP_HTTP_CHUNK_SIZE);

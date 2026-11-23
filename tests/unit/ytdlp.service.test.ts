@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
+import fs from "node:fs";
 import { ERROR_CODES } from "@/lib/errors";
-import { mapYtDlpStderrToError, parseYtDlpProgressLine } from "@/services/ytdlp.service";
+import {
+  mapYtDlpStderrToError,
+  parseYtDlpProgressLine,
+  resolveCookiesArgs,
+  resolveExtractorArgs,
+} from "@/services/ytdlp.service";
+import type { AppEnv } from "@/lib/env";
 
 describe("ytdlp.service progress parsing and error mapping", () => {
   describe("parseYtDlpProgressLine", () => {
@@ -123,6 +130,69 @@ describe("ytdlp.service progress parsing and error mapping", () => {
       );
       expect(err.code).toBe(ERROR_CODES.YTDLP_FAILED);
       expect(err.status).toBe(502);
+    });
+  });
+
+  describe("resolveExtractorArgs", () => {
+    it("returns default skip args without hardcoded player_client when env is empty", () => {
+      const env = {
+        YTDLP_EXTRACTOR_ARGS: "",
+        YTDLP_PLAYER_CLIENT: "",
+      } as unknown as AppEnv;
+      expect(resolveExtractorArgs(env)).toEqual([
+        "--extractor-args",
+        "youtube:skip=translated_subs,comments",
+      ]);
+    });
+
+    it("respects YTDLP_PLAYER_CLIENT when configured", () => {
+      const env = {
+        YTDLP_EXTRACTOR_ARGS: "",
+        YTDLP_PLAYER_CLIENT: "tv_samsung,visionos",
+      } as unknown as AppEnv;
+      expect(resolveExtractorArgs(env)).toEqual([
+        "--extractor-args",
+        "youtube:player_client=tv_samsung,visionos;skip=translated_subs,comments",
+      ]);
+    });
+
+    it("respects clientOverride when provided", () => {
+      const env = {
+        YTDLP_EXTRACTOR_ARGS: "",
+        YTDLP_PLAYER_CLIENT: "",
+      } as unknown as AppEnv;
+      expect(resolveExtractorArgs(env, "tv_embedded,web")).toEqual([
+        "--extractor-args",
+        "youtube:player_client=tv_embedded,web;skip=translated_subs,comments",
+      ]);
+    });
+
+    it("prioritizes raw YTDLP_EXTRACTOR_ARGS when provided", () => {
+      const env = {
+        YTDLP_EXTRACTOR_ARGS: "youtube:player_client=ios",
+        YTDLP_PLAYER_CLIENT: "web",
+      } as unknown as AppEnv;
+      expect(resolveExtractorArgs(env)).toEqual([
+        "--extractor-args",
+        "youtube:player_client=ios",
+      ]);
+    });
+  });
+
+  describe("resolveCookiesArgs", () => {
+    it("normalizes literal escaped newlines in YTDLP_COOKIES_TEXT", () => {
+      const env = {
+        YTDLP_COOKIES_FILE: "",
+        YTDLP_COOKIES_TEXT: "# Netscape HTTP Cookie File\\n.youtube.com\\tTRUE\\t/\\tTRUE\\t0\\tSID\\tsomevalue",
+        YTDLP_COOKIES_BASE64: "",
+        YTDLP_COOKIES_FROM_BROWSER: "",
+      } as unknown as AppEnv;
+      const res = resolveCookiesArgs(env);
+      expect(res[0]).toBe("--cookies");
+      const cookieFile = res[1]!;
+      expect(fs.existsSync(cookieFile)).toBe(true);
+      const content = fs.readFileSync(cookieFile, "utf8");
+      expect(content).toContain("\n.youtube.com");
     });
   });
 });

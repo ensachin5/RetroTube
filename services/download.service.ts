@@ -13,7 +13,7 @@ import { videosRepo } from "@/repositories/videos.repo";
 import { diskService } from "./disk.service";
 import { jobService } from "./job.service";
 import { killProcessTree } from "./process.util";
-import { resolveCookiesArgs } from "./ytdlp.service";
+import { resolveCookiesArgs, resolveExtractorArgs } from "./ytdlp.service";
 
 export const ALLOWED_TARGET_CONTAINERS = [
   "mp4",
@@ -421,9 +421,8 @@ export const downloadService = {
       env.YTDLP_BUFFER_SIZE,
       "--socket-timeout",
       "15",
-      "--extractor-args",
-      "youtube:player_client=android,web;skip=translated_subs,comments",
     ];
+    args.push(...resolveExtractorArgs(env));
 
     args.push(...resolveCookiesArgs(env));
     if (env.YTDLP_PROXY) {

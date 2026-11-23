@@ -38,6 +38,8 @@ const envSchema = z.object({
   YTDLP_COOKIES_TEXT: z.string().trim().default(""),
   YTDLP_COOKIES_BASE64: z.string().trim().default(""),
   YTDLP_COOKIES_FROM_BROWSER: z.string().trim().default(""),
+  YTDLP_PLAYER_CLIENT: z.string().trim().default(""),
+  YTDLP_EXTRACTOR_ARGS: z.string().trim().default(""),
   YTDLP_USE_ARIA2: z
     .preprocess((val) => val === "true" || val === "1" || val === true, z.boolean())
     .default(false),
@@ -97,6 +99,10 @@ export function getEnv(): AppEnv {
     YTDLP_COOKIES_BASE64: emptyToUndefined(process.env.YTDLP_COOKIES_BASE64) ?? "",
     YTDLP_COOKIES_FROM_BROWSER:
       emptyToUndefined(process.env.YTDLP_COOKIES_FROM_BROWSER) ?? "",
+    YTDLP_PLAYER_CLIENT:
+      emptyToUndefined(process.env.YTDLP_PLAYER_CLIENT) ?? "",
+    YTDLP_EXTRACTOR_ARGS:
+      emptyToUndefined(process.env.YTDLP_EXTRACTOR_ARGS) ?? "",
     YTDLP_USE_ARIA2: emptyToUndefined(process.env.YTDLP_USE_ARIA2),
   });
 }
