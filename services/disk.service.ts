@@ -122,12 +122,26 @@ export const diskService = {
   },
 
   async assertSufficientDisk(requiredBytes: number): Promise<void> {
-    const check = await this.checkAvailableDisk(requiredBytes);
+    let check = await this.checkAvailableDisk(requiredBytes);
     if (!check.hasSufficientSpace) {
+      try {
+        await this.cleanStorage(false, 15);
+      } catch {
+        // Ignore opportunistic cleanup failure
+      }
+      check = await this.checkAvailableDisk(requiredBytes);
+    }
+
+    if (!check.hasSufficientSpace) {
+      const isVercel = process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
+      const hint =
+        isVercel && check.requiredMb > 450
+          ? " (Note: Vercel serverless has a 500 MB /tmp limit. For large 4K files, select 720p/1080p or audio)."
+          : "";
       throw new AppError({
         code: ERROR_CODES.INSUFFICIENT_DISK,
         status: 507,
-        message: `Insufficient disk space: this operation requires ~${check.requiredMb} MB but only ${check.availableMb} MB is free (${check.reserveMb} MB kept in reserve).`,
+        message: `Insufficient disk space: this operation requires ~${check.requiredMb} MB but only ${check.availableMb} MB is free (${check.reserveMb} MB kept in reserve).${hint}`,
         details: check,
       });
     }

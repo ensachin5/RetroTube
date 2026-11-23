@@ -18,7 +18,7 @@ const envSchema = z.object({
   BATCH_ITEM_DELAY_MS: z.coerce.number().int().min(0).max(60000).default(1500),
   SERVER_SAVE_DIR: z.string().trim().default(""),
   FILE_TTL_MINUTES: z.coerce.number().int().min(5).max(10080).default(120),
-  MIN_FREE_DISK_GB: z.coerce.number().min(0).default(5),
+  MIN_FREE_DISK_GB: z.coerce.number().min(0).default(isVercel ? 0.02 : 2),
   CACHE_TTL_SECONDS: z.coerce.number().int().min(0).max(86400).default(3600),
   RATE_LIMIT_FETCH_PER_MIN: z.coerce.number().int().min(1).max(1000).default(20),
   RATE_LIMIT_DOWNLOAD_PER_MIN: z.coerce.number().int().min(1).max(1000).default(10),
@@ -68,6 +68,13 @@ export function getEnv(): AppEnv {
       ? "/tmp/retrotube"
       : rawTempDir;
 
+  const rawMinFreeDisk = emptyToUndefined(process.env.MIN_FREE_DISK_GB);
+  // On Vercel serverless, /tmp is capped at ~512MB total.
+  // A multi-GB reserve floor will always fail. Cap reserve to at most 0.05 GB (50MB) on Vercel unless explicitly overridden.
+  const safeMinFreeDisk = isVercel
+    ? (rawMinFreeDisk !== undefined ? Math.min(Number(rawMinFreeDisk), 0.05) : 0.02)
+    : rawMinFreeDisk;
+
   return envSchema.parse({
     YTDLP_PATH: emptyToUndefined(process.env.YTDLP_PATH),
     FFMPEG_PATH: emptyToUndefined(process.env.FFMPEG_PATH),
@@ -81,7 +88,7 @@ export function getEnv(): AppEnv {
     BATCH_ITEM_DELAY_MS: emptyToUndefined(process.env.BATCH_ITEM_DELAY_MS),
     SERVER_SAVE_DIR: emptyToUndefined(process.env.SERVER_SAVE_DIR) ?? "",
     FILE_TTL_MINUTES: emptyToUndefined(process.env.FILE_TTL_MINUTES),
-    MIN_FREE_DISK_GB: emptyToUndefined(process.env.MIN_FREE_DISK_GB),
+    MIN_FREE_DISK_GB: safeMinFreeDisk,
     CACHE_TTL_SECONDS: emptyToUndefined(process.env.CACHE_TTL_SECONDS),
     RATE_LIMIT_FETCH_PER_MIN: emptyToUndefined(process.env.RATE_LIMIT_FETCH_PER_MIN),
     RATE_LIMIT_DOWNLOAD_PER_MIN: emptyToUndefined(

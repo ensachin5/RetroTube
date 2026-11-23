@@ -76,6 +76,28 @@ describe("DiskService & Storage API", () => {
         }),
       );
     });
+
+    it("allows downloads on Vercel with 512 MB tmp space when file fits within available space", async () => {
+      process.env.VERCEL = "1";
+      delete process.env.MIN_FREE_DISK_GB;
+
+      vi.spyOn(diskService, "getStorageStats").mockResolvedValue({
+        tempDirPath: "/tmp/retrotube",
+        diskTotalBytes: 512 * 1024 * 1024,
+        diskFreeBytes: 450 * 1024 * 1024, // 450 MB free on Vercel
+        diskUsedBytes: 62 * 1024 * 1024,
+        minFreeDiskGb: 0.02,
+        tempUsageBytes: 0,
+        tempFileCount: 0,
+        runningJobsCount: 0,
+      });
+
+      // 50 MB file should succeed easily with ~20MB reserve
+      const check = await diskService.checkAvailableDisk(50 * 1024 * 1024);
+      expect(check.hasSufficientSpace).toBe(true);
+
+      delete process.env.VERCEL;
+    });
   });
 
   describe("Storage Cleanup", () => {
