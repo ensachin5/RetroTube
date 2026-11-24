@@ -339,11 +339,11 @@ export function formatRowsToPresentation(
       const hdrDiff = Number(b.isHdr) - Number(a.isHdr);
       if (hdrDiff !== 0) return hdrDiff;
 
-      const bitrateDiff = (b.bitrateKbps ?? 0) - (a.bitrateKbps ?? 0);
-      if (bitrateDiff !== 0) return bitrateDiff;
-
       const mp4Diff = Number(b.container === "mp4") - Number(a.container === "mp4");
       if (mp4Diff !== 0) return mp4Diff;
+
+      const bitrateDiff = (b.bitrateKbps ?? 0) - (a.bitrateKbps ?? 0);
+      if (bitrateDiff !== 0) return bitrateDiff;
 
       return (b.filesizeBytes ?? 0) - (a.filesizeBytes ?? 0);
     })

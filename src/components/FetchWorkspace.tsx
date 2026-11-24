@@ -294,18 +294,6 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
     });
 
     try {
-      const iframe = document.createElement("iframe");
-      iframe.style.display = "none";
-      iframe.src = directUrl;
-      document.body.appendChild(iframe);
-      setTimeout(() => {
-        iframe.remove();
-      }, 30000);
-    } catch {
-      // Ignore iframe fallback
-    }
-
-    try {
       const anchor = document.createElement("a");
       anchor.href = directUrl;
       anchor.download = outputFilename;
@@ -313,7 +301,7 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
       anchor.click();
       setTimeout(() => anchor.remove(), 100);
     } catch {
-      // Ignore anchor fallback
+      // Fallback handled by the on-screen "Save File" button
     }
 
     setToast({

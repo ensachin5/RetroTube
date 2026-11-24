@@ -266,24 +266,6 @@ export function FormatResultsPanel({
                   🎵 Direct Audio ({bestAudioFormat.bitrateKbps ? `${Math.round(bestAudioFormat.bitrateKbps)}k` : "Audio"})
                 </Button>
               ) : null}
-
-              {bestVideoFormat ? (
-                <Button
-                  variant="surface"
-                  size="md"
-                  disabled={startingJob}
-                  onClick={() =>
-                    onStartDownload({
-                      kind: "video",
-                      format: bestVideoFormat,
-                      label: `${bestVideoFormat.resolution ?? "Best Video"} ${bestVideoFormat.recommendedContainer.toUpperCase()}`,
-                    })
-                  }
-                  className="font-bold uppercase tracking-wider flex-1 sm:flex-initial"
-                >
-                  📼 Tape Deck
-                </Button>
-              ) : null}
             </div>
           </div>
         </Card>
