@@ -408,17 +408,23 @@ export const downloadService = {
     const env = getEnv();
     const ytDlpPath = await ensureYtDlpBinary();
 
+    const concurrentFragments = Math.max(4, env.YTDLP_CONCURRENT_FRAGMENTS || 4);
     const args = [
       "-o",
       "-",
       "--no-playlist",
       "--no-warnings",
+      "--no-check-formats",
+      "--concurrent-fragments",
+      String(concurrentFragments),
+      "--http-chunk-size",
+      "10M",
       "--remote-components",
       "ejs:github",
       "--js-runtimes",
       "node",
       "--buffer-size",
-      env.YTDLP_BUFFER_SIZE,
+      "4096K",
       "--socket-timeout",
       "15",
     ];

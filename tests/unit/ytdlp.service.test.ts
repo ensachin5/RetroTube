@@ -141,7 +141,7 @@ describe("ytdlp.service progress parsing and error mapping", () => {
       } as unknown as AppEnv;
       expect(resolveExtractorArgs(env)).toEqual([
         "--extractor-args",
-        "youtube:skip=translated_subs,comments",
+        "youtube:skip=translated_subs,comments,hls",
       ]);
     });
 
@@ -152,7 +152,7 @@ describe("ytdlp.service progress parsing and error mapping", () => {
       } as unknown as AppEnv;
       expect(resolveExtractorArgs(env)).toEqual([
         "--extractor-args",
-        "youtube:player_client=tv_samsung,visionos;skip=translated_subs,comments",
+        "youtube:player_client=tv_samsung,visionos;skip=translated_subs,comments,hls",
       ]);
     });
 
@@ -163,7 +163,7 @@ describe("ytdlp.service progress parsing and error mapping", () => {
       } as unknown as AppEnv;
       expect(resolveExtractorArgs(env, "tv_embedded,web")).toEqual([
         "--extractor-args",
-        "youtube:player_client=tv_embedded,web;skip=translated_subs,comments",
+        "youtube:player_client=tv_embedded,web;skip=translated_subs,comments,hls",
       ]);
     });
 

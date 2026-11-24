@@ -59,13 +59,13 @@ export function resolveExtractorArgs(env: AppEnv, clientOverride?: string): stri
   }
   const client = clientOverride || env.YTDLP_PLAYER_CLIENT;
   if (client) {
-    return ["--extractor-args", `youtube:player_client=${client};skip=translated_subs,comments`];
+    return ["--extractor-args", `youtube:player_client=${client};skip=translated_subs,comments,hls`];
   }
   // Default: do not hardcode player_client=android,web.
   // In modern yt-dlp, omitting player_client allows yt-dlp to use its resilient
   // multi-client default ('tv_samsung', 'visionos', 'web') which does not get blocked
   // by YouTube's android PO token requirements or cloud datacenter IP blocks.
-  return ["--extractor-args", "youtube:skip=translated_subs,comments"];
+  return ["--extractor-args", "youtube:skip=translated_subs,comments,hls"];
 }
 
 export interface DownloadProgressSample {

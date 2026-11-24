@@ -59,6 +59,8 @@ export interface FetchWorkspaceProps {
   initialUrl?: string;
 }
 
+const clientFetchCache = new Map<string, FetchVideoResponseDto>();
+
 export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
   const [lastSubmittedUrl, setLastSubmittedUrl] = useState(initialUrl);
   const [fetching, setFetching] = useState(false);
@@ -115,31 +117,14 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
   );
 
   const fetchSingleVideo = useCallback(async (url: string) => {
-    setLastSubmittedUrl(url);
-    setFetching(true);
+    const trimmedUrl = url.trim();
+    setLastSubmittedUrl(trimmedUrl);
     setFetchError(null);
     setPlaylistResult(null);
     setCombinedPrompt(null);
 
-    try {
-      const response = await fetch("/api/fetch", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-
-      const payload = (await response.json()) as FetchVideoResponseDto & ApiErrorPayload;
-      if (!response.ok) {
-        setFetchError({
-          code: payload.error?.code ?? "INTERNAL_ERROR",
-          message: payload.error?.message ?? "Failed to fetch video metadata.",
-        });
-        setResult(null);
-        return;
-      }
-
+    const applyPayload = (payload: FetchVideoResponseDto) => {
       setResult(payload);
-
       const topVideo = groupVideoFormatsByResolution(payload.videoFormats);
       const bestVideo = topVideo.groups[0]?.formats[0];
       if (bestVideo) {
@@ -160,6 +145,35 @@ export function FetchWorkspace({ initialUrl = "" }: FetchWorkspaceProps) {
       } else {
         setSelectedAction(null);
       }
+    };
+
+    const cached = clientFetchCache.get(trimmedUrl);
+    if (cached) {
+      applyPayload(cached);
+      return;
+    }
+
+    setFetching(true);
+
+    try {
+      const response = await fetch("/api/fetch", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: trimmedUrl }),
+      });
+
+      const payload = (await response.json()) as FetchVideoResponseDto & ApiErrorPayload;
+      if (!response.ok) {
+        setFetchError({
+          code: payload.error?.code ?? "INTERNAL_ERROR",
+          message: payload.error?.message ?? "Failed to fetch video metadata.",
+        });
+        setResult(null);
+        return;
+      }
+
+      clientFetchCache.set(trimmedUrl, payload);
+      applyPayload(payload);
     } catch {
       setFetchError({
         code: "INTERNAL_ERROR",
